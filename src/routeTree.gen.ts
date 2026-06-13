@@ -13,6 +13,14 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
+import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
+import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects.$projectId.index'
+import { Route as ProjectsProjectIdDependenciesRouteImport } from './routes/projects.$projectId.dependencies'
+import { Route as ProjectsProjectIdDatabaseRouteImport } from './routes/projects.$projectId.database'
+import { Route as ProjectsProjectIdChatRouteImport } from './routes/projects.$projectId.chat'
+import { Route as ProjectsProjectIdBackendRouteImport } from './routes/projects.$projectId.backend'
+import { Route as ProjectsProjectIdArchitectureRouteImport } from './routes/projects.$projectId.architecture'
+import { Route as ProjectsProjectIdApisRouteImport } from './routes/projects.$projectId.apis'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -34,38 +42,142 @@ const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   path: '/projects/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
+  id: '/projects/$projectId',
+  path: '/projects/$projectId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProjectsProjectIdRoute,
+} as any)
+const ProjectsProjectIdDependenciesRoute =
+  ProjectsProjectIdDependenciesRouteImport.update({
+    id: '/dependencies',
+    path: '/dependencies',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ProjectsProjectIdDatabaseRoute =
+  ProjectsProjectIdDatabaseRouteImport.update({
+    id: '/database',
+    path: '/database',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ProjectsProjectIdChatRoute = ProjectsProjectIdChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => ProjectsProjectIdRoute,
+} as any)
+const ProjectsProjectIdBackendRoute =
+  ProjectsProjectIdBackendRouteImport.update({
+    id: '/backend',
+    path: '/backend',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ProjectsProjectIdArchitectureRoute =
+  ProjectsProjectIdArchitectureRouteImport.update({
+    id: '/architecture',
+    path: '/architecture',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ProjectsProjectIdApisRoute = ProjectsProjectIdApisRouteImport.update({
+  id: '/apis',
+  path: '/apis',
+  getParentRoute: () => ProjectsProjectIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/': typeof ProjectsIndexRoute
+  '/projects/$projectId/apis': typeof ProjectsProjectIdApisRoute
+  '/projects/$projectId/architecture': typeof ProjectsProjectIdArchitectureRoute
+  '/projects/$projectId/backend': typeof ProjectsProjectIdBackendRoute
+  '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
+  '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
+  '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
   '/projects': typeof ProjectsIndexRoute
+  '/projects/$projectId/apis': typeof ProjectsProjectIdApisRoute
+  '/projects/$projectId/architecture': typeof ProjectsProjectIdArchitectureRoute
+  '/projects/$projectId/backend': typeof ProjectsProjectIdBackendRoute
+  '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
+  '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
+  '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
+  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/projects/': typeof ProjectsIndexRoute
+  '/projects/$projectId/apis': typeof ProjectsProjectIdApisRoute
+  '/projects/$projectId/architecture': typeof ProjectsProjectIdArchitectureRoute
+  '/projects/$projectId/backend': typeof ProjectsProjectIdBackendRoute
+  '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
+  '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
+  '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/signup' | '/projects/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/projects/$projectId'
+    | '/projects/'
+    | '/projects/$projectId/apis'
+    | '/projects/$projectId/architecture'
+    | '/projects/$projectId/backend'
+    | '/projects/$projectId/chat'
+    | '/projects/$projectId/database'
+    | '/projects/$projectId/dependencies'
+    | '/projects/$projectId/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/signup' | '/projects'
-  id: '__root__' | '/' | '/login' | '/signup' | '/projects/'
+  to:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/projects'
+    | '/projects/$projectId/apis'
+    | '/projects/$projectId/architecture'
+    | '/projects/$projectId/backend'
+    | '/projects/$projectId/chat'
+    | '/projects/$projectId/database'
+    | '/projects/$projectId/dependencies'
+    | '/projects/$projectId'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/projects/$projectId'
+    | '/projects/'
+    | '/projects/$projectId/apis'
+    | '/projects/$projectId/architecture'
+    | '/projects/$projectId/backend'
+    | '/projects/$projectId/chat'
+    | '/projects/$projectId/database'
+    | '/projects/$projectId/dependencies'
+    | '/projects/$projectId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
   ProjectsIndexRoute: typeof ProjectsIndexRoute
 }
 
@@ -99,13 +211,93 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects/$projectId': {
+      id: '/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/$projectId/': {
+      id: '/projects/$projectId/'
+      path: '/'
+      fullPath: '/projects/$projectId/'
+      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/dependencies': {
+      id: '/projects/$projectId/dependencies'
+      path: '/dependencies'
+      fullPath: '/projects/$projectId/dependencies'
+      preLoaderRoute: typeof ProjectsProjectIdDependenciesRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/database': {
+      id: '/projects/$projectId/database'
+      path: '/database'
+      fullPath: '/projects/$projectId/database'
+      preLoaderRoute: typeof ProjectsProjectIdDatabaseRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/chat': {
+      id: '/projects/$projectId/chat'
+      path: '/chat'
+      fullPath: '/projects/$projectId/chat'
+      preLoaderRoute: typeof ProjectsProjectIdChatRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/backend': {
+      id: '/projects/$projectId/backend'
+      path: '/backend'
+      fullPath: '/projects/$projectId/backend'
+      preLoaderRoute: typeof ProjectsProjectIdBackendRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/architecture': {
+      id: '/projects/$projectId/architecture'
+      path: '/architecture'
+      fullPath: '/projects/$projectId/architecture'
+      preLoaderRoute: typeof ProjectsProjectIdArchitectureRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/apis': {
+      id: '/projects/$projectId/apis'
+      path: '/apis'
+      fullPath: '/projects/$projectId/apis'
+      preLoaderRoute: typeof ProjectsProjectIdApisRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
   }
 }
+
+interface ProjectsProjectIdRouteChildren {
+  ProjectsProjectIdApisRoute: typeof ProjectsProjectIdApisRoute
+  ProjectsProjectIdArchitectureRoute: typeof ProjectsProjectIdArchitectureRoute
+  ProjectsProjectIdBackendRoute: typeof ProjectsProjectIdBackendRoute
+  ProjectsProjectIdChatRoute: typeof ProjectsProjectIdChatRoute
+  ProjectsProjectIdDatabaseRoute: typeof ProjectsProjectIdDatabaseRoute
+  ProjectsProjectIdDependenciesRoute: typeof ProjectsProjectIdDependenciesRoute
+  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
+}
+
+const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
+  ProjectsProjectIdApisRoute: ProjectsProjectIdApisRoute,
+  ProjectsProjectIdArchitectureRoute: ProjectsProjectIdArchitectureRoute,
+  ProjectsProjectIdBackendRoute: ProjectsProjectIdBackendRoute,
+  ProjectsProjectIdChatRoute: ProjectsProjectIdChatRoute,
+  ProjectsProjectIdDatabaseRoute: ProjectsProjectIdDatabaseRoute,
+  ProjectsProjectIdDependenciesRoute: ProjectsProjectIdDependenciesRoute,
+  ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
+}
+
+const ProjectsProjectIdRouteWithChildren =
+  ProjectsProjectIdRoute._addFileChildren(ProjectsProjectIdRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
   ProjectsIndexRoute: ProjectsIndexRoute,
 }
 export const routeTree = rootRouteImport
