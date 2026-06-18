@@ -1,7 +1,8 @@
 import { createFileRoute, useParams } from "@tanstack/react-router";
-import { getProject } from "@/lib/mock-data";
+import { getProject } from "@/services/projectService";
 import { useState, useRef, useEffect } from "react";
-import { Send, FileCode2, Sparkles } from "lucide-react";
+import { Send, FileCode2, Sparkles, Loader2 } from "lucide-react";
+import type { Project } from "@/types/project";
 
 export const Route = createFileRoute("/projects/$projectId/chat")({
   component: ChatPage,
@@ -18,15 +19,26 @@ const SUGGESTIONS = [
 
 function ChatPage() {
   const { projectId } = useParams({ from: "/projects/$projectId/chat" });
-  const p = getProject(projectId);
+
+  const [project, setProject] = useState<Project | null>(null);
+  const [projectLoading, setProjectLoading] = useState(true);
+
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
-  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, pending]);
+  useEffect(() => {
+    getProject(projectId)
+      .then(setProject)
+      .finally(() => setProjectLoading(false));
+  }, [projectId]);
+
+  useEffect(() => { inputRef.current?.focus(); }, [projectLoading]);
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, pending]);
 
   function send(text: string) {
     const q = text.trim();
@@ -39,8 +51,11 @@ function ChatPage() {
         ...m,
         {
           role: "assistant",
-          content: mockAnswer(q, p.name),
-          sources: ["src/routes/auth.js", "src/components/Login.jsx", "src/services/jwt.js"].slice(0, 2 + (q.length % 2)),
+          content: mockAnswer(q, project?.name ?? projectId),
+          sources: ["src/routes/auth.js", "src/components/Login.jsx", "src/services/jwt.js"].slice(
+            0,
+            2 + (q.length % 2)
+          ),
         },
       ]);
       setPending(false);
@@ -48,11 +63,23 @@ function ChatPage() {
     }, 900);
   }
 
+  if (projectLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="text-sm">Analyzing project…</span>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       <header className="mb-4">
         <h2 className="text-2xl font-semibold tracking-tight">Ask your project anything</h2>
-        <p className="text-muted-foreground text-sm">Grounded in {p.files} files indexed from {p.name}.</p>
+        <p className="text-muted-foreground text-sm">
+          Grounded in {project?.filesCount ?? 0} files indexed from{" "}
+          {project?.name ?? projectId}.
+        </p>
       </header>
 
       <div ref={scrollRef} className="flex-1 glass rounded-2xl p-6 overflow-y-auto">
@@ -65,7 +92,11 @@ function ChatPage() {
             <div className="text-sm text-muted-foreground">Try one of these:</div>
             <div className="mt-4 grid sm:grid-cols-2 gap-2 max-w-xl w-full">
               {SUGGESTIONS.map((s) => (
-                <button key={s} onClick={() => send(s)} className="glass rounded-lg px-3 py-2.5 text-sm text-left hover:bg-secondary/50 transition">
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  className="glass rounded-lg px-3 py-2.5 text-sm text-left hover:bg-secondary/50 transition"
+                >
                   {s}
                 </button>
               ))}
@@ -95,11 +126,17 @@ function ChatPage() {
           rows={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
+          }}
           placeholder="Ask about routes, files, architecture, business logic…"
           className="flex-1 resize-none bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-muted-foreground max-h-40"
         />
-        <button type="submit" disabled={!input.trim() || pending} className="btn-primary-grad rounded-lg h-10 w-10 flex items-center justify-center disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={!input.trim() || pending}
+          className="btn-primary-grad rounded-lg h-10 w-10 flex items-center justify-center disabled:opacity-50"
+        >
           <Send className="h-4 w-4" />
         </button>
       </form>
@@ -111,7 +148,9 @@ function MessageBubble({ msg }: { msg: Msg }) {
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-primary text-primary-foreground">{msg.content}</div>
+        <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm bg-primary text-primary-foreground">
+          {msg.content}
+        </div>
       </div>
     );
   }
@@ -124,10 +163,15 @@ function MessageBubble({ msg }: { msg: Msg }) {
         <div className="text-sm leading-7 whitespace-pre-wrap">{msg.content}</div>
         {msg.sources && (
           <div className="mt-3">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono mb-1.5">Sources</div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono mb-1.5">
+              Sources
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {msg.sources.map((s) => (
-                <span key={s} className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-1 rounded-md bg-secondary/60 border border-border">
+                <span
+                  key={s}
+                  className="inline-flex items-center gap-1.5 text-xs font-mono px-2 py-1 rounded-md bg-secondary/60 border border-border"
+                >
                   <FileCode2 className="h-3 w-3 text-accent" /> {s}
                 </span>
               ))}

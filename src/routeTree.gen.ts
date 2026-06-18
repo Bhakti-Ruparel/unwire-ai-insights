@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects.$projectId.index'
+import { Route as ProjectsProjectIdServicesRouteImport } from './routes/projects.$projectId.services'
 import { Route as ProjectsProjectIdDependenciesRouteImport } from './routes/projects.$projectId.dependencies'
 import { Route as ProjectsProjectIdDatabaseRouteImport } from './routes/projects.$projectId.database'
 import { Route as ProjectsProjectIdChatRouteImport } from './routes/projects.$projectId.chat'
@@ -52,6 +53,12 @@ const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ProjectsProjectIdRoute,
 } as any)
+const ProjectsProjectIdServicesRoute =
+  ProjectsProjectIdServicesRouteImport.update({
+    id: '/services',
+    path: '/services',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
 const ProjectsProjectIdDependenciesRoute =
   ProjectsProjectIdDependenciesRouteImport.update({
     id: '/dependencies',
@@ -99,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
   '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
   '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
+  '/projects/$projectId/services': typeof ProjectsProjectIdServicesRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -112,6 +120,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
   '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
   '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
+  '/projects/$projectId/services': typeof ProjectsProjectIdServicesRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRoutesById {
@@ -127,6 +136,7 @@ export interface FileRoutesById {
   '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
   '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
   '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
+  '/projects/$projectId/services': typeof ProjectsProjectIdServicesRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -143,6 +153,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/chat'
     | '/projects/$projectId/database'
     | '/projects/$projectId/dependencies'
+    | '/projects/$projectId/services'
     | '/projects/$projectId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -156,6 +167,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/chat'
     | '/projects/$projectId/database'
     | '/projects/$projectId/dependencies'
+    | '/projects/$projectId/services'
     | '/projects/$projectId'
   id:
     | '__root__'
@@ -170,6 +182,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/chat'
     | '/projects/$projectId/database'
     | '/projects/$projectId/dependencies'
+    | '/projects/$projectId/services'
     | '/projects/$projectId/'
   fileRoutesById: FileRoutesById
 }
@@ -225,6 +238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
+    '/projects/$projectId/services': {
+      id: '/projects/$projectId/services'
+      path: '/services'
+      fullPath: '/projects/$projectId/services'
+      preLoaderRoute: typeof ProjectsProjectIdServicesRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
     '/projects/$projectId/dependencies': {
       id: '/projects/$projectId/dependencies'
       path: '/dependencies'
@@ -277,6 +297,7 @@ interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdChatRoute: typeof ProjectsProjectIdChatRoute
   ProjectsProjectIdDatabaseRoute: typeof ProjectsProjectIdDatabaseRoute
   ProjectsProjectIdDependenciesRoute: typeof ProjectsProjectIdDependenciesRoute
+  ProjectsProjectIdServicesRoute: typeof ProjectsProjectIdServicesRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
 }
 
@@ -287,6 +308,7 @@ const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
   ProjectsProjectIdChatRoute: ProjectsProjectIdChatRoute,
   ProjectsProjectIdDatabaseRoute: ProjectsProjectIdDatabaseRoute,
   ProjectsProjectIdDependenciesRoute: ProjectsProjectIdDependenciesRoute,
+  ProjectsProjectIdServicesRoute: ProjectsProjectIdServicesRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
 }
 
@@ -303,3 +325,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
