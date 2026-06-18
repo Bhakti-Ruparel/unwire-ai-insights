@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast, Toaster } from "sonner";
 import { authSignup } from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
 import { AuthShell, Field, Divider, GoogleButton } from "./login";
 
 export const Route = createFileRoute("/signup")({
@@ -11,6 +12,7 @@ export const Route = createFileRoute("/signup")({
 
 function Signup() {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,6 +23,7 @@ function Signup() {
     setLoading(true);
     try {
       await authSignup({ name, email, password });
+      await refreshUser();
       toast.success("Account created!");
       navigate({ to: "/projects" });
     } catch (err: unknown) {

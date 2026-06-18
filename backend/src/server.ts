@@ -3,10 +3,13 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import fs from "fs";
-import projectRoutes from "./routes/projectRoutes";
-import authRoutes from "./routes/authRoutes";
+import projectRoutes    from "./routes/projectRoutes";
+import authRoutes       from "./routes/authRoutes";
+import serverRoutes     from "./routes/serverRoutes";
+import adminRoutes      from "./routes/adminRoutes";
+import deploymentRoutes from "./routes/deploymentRoutes";
 import { prisma } from "./database/db";
-import { authenticate } from "./middleware/authenticate";
+import { authenticate, optionalAuth } from "./middleware/authenticate";
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? "5000", 10);
@@ -48,21 +51,13 @@ app.use("/uploads", express.static(uploadsDir));
 
 app.use("/api/auth", authRoutes);
 
-// Attach user to request if token present (optional auth — doesn't block unauthenticated requests)
-app.use((req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith("Bearer ")) {
-    try {
-      const { verifyToken } = require("./services/authService");
-      req.user = verifyToken(authHeader.slice(7));
-    } catch {
-      // Invalid token — continue without user
-    }
-  }
-  next();
-});
+// Attach user to request if token present (optional — never blocks)
+app.use(optionalAuth);
 
-app.use("/api/projects", projectRoutes);
+app.use("/api/projects",     projectRoutes);
+app.use("/api/servers",      serverRoutes);
+app.use("/api/admin",        adminRoutes);
+app.use("/api/deployments",  deploymentRoutes);
 
 // Health check
 app.get("/health", (_req, res) => {
@@ -93,6 +88,10 @@ async function start() {
   try {
     await prisma.$connect();
     console.log("✓ Database connected");
+
+    // Start BullMQ deployment worker (non-blocking, degrades gracefully without Redis)
+    const { startDeploymentWorker } = await import("./queue/deploymentWorker");
+    await startDeploymentWorker();
 
     app.listen(PORT, () => {
       console.log(`✓ Server running on http://localhost:${PORT}`);

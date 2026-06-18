@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import * as controller from "../controllers/projectController";
 import { authenticate } from "../middleware/authenticate";
+import { getDeploymentPlan } from "../controllers/deploymentController";
 
 const router = Router();
 
@@ -58,5 +59,6 @@ router.get("/:id/report",        controller.getProjectReport);
 // Deployment Intelligence
 router.get("/:id/deployment",           controller.getDeployment);
 router.post("/:id/deployment/refresh",  controller.refreshDeployment);
+router.get("/:id/deployment-plan",      getDeploymentPlan);
 
 export default router;

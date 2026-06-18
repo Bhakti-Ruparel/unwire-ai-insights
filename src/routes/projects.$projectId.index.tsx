@@ -1,9 +1,9 @@
-import { createFileRoute, useParams } from "@tanstack/react-router";
+import { createFileRoute, useParams, Link } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import { ArchitectureDiagram } from "@/components/ArchitectureDiagram";
 import { getProject, getProjectOverview } from "@/services/projectService";
 import type { Project, ProjectOverview } from "@/types/project";
-import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Rocket } from "lucide-react";
 
 export const Route = createFileRoute("/projects/$projectId/")({
   component: Overview,
@@ -114,12 +114,21 @@ function Overview() {
 
   return (
     <div className="space-y-6">
-      {/* Project name + description */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {project.description || "No description available."}
-        </p>
+      {/* Project name + description + Deploy button */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{project.name}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {project.description || "No description available."}
+          </p>
+        </div>
+        <Link
+          to="/projects/$projectId/deployments"
+          params={{ projectId: project.id }}
+          className="btn-primary-grad px-4 py-2.5 rounded-md font-medium flex items-center gap-2 text-sm shrink-0"
+        >
+          <Rocket className="h-4 w-4" /> Deploy
+        </Link>
       </div>
 
       {/* Stat cards */}

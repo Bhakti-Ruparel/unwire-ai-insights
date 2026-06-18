@@ -29,19 +29,31 @@ const API_BASE =
 
 // ─── Token storage ─────────────────────────────────────────────────────────
 
-const TOKEN_KEY = "unwire_auth_token";
+const ACCESS_KEY  = "unwire_access_token";
+const REFRESH_KEY = "unwire_refresh_token";
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem(ACCESS_KEY);
 }
 
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
+export function setTokens(access: string, refresh: string): void {
+  localStorage.setItem(ACCESS_KEY, access);
+  localStorage.setItem(REFRESH_KEY, refresh);
 }
 
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+export function clearTokens(): void {
+  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(REFRESH_KEY);
 }
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_KEY);
+}
+
+/** @deprecated use setTokens */
+export function setToken(token: string): void { localStorage.setItem(ACCESS_KEY, token); }
+/** @deprecated use clearTokens */
+export function clearToken(): void { clearTokens(); }
 
 // ─── Shared fetch wrapper ──────────────────────────────────────────────────
 
@@ -57,18 +69,24 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     "Content-Type": "application/json",
     ...(options?.headers as Record<string, string>),
   };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  let res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  // Auto-refresh on 401 (expired access token)
+  if (res.status === 401 && getRefreshToken()) {
+    const refreshed = await authRefresh();
+    if (refreshed) {
+      const newToken = getToken();
+      if (newToken) headers["Authorization"] = `Bearer ${newToken}`;
+      res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    }
   }
 
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   const json: BackendResponse<T> = await res.json();
-
   if (!res.ok || !json.success) {
     throw new Error(json.error ?? `Request failed: ${res.status}`);
   }
-
   return json.data as T;
 }
 
@@ -79,7 +97,7 @@ export async function authLogin(payload: LoginPayload): Promise<AuthResult> {
     method: "POST",
     body: JSON.stringify(payload),
   });
-  setToken(result.token);
+  setTokens(result.tokens.accessToken, result.tokens.refreshToken);
   return result;
 }
 
@@ -88,12 +106,35 @@ export async function authSignup(payload: SignupPayload): Promise<AuthResult> {
     method: "POST",
     body: JSON.stringify(payload),
   });
-  setToken(result.token);
+  setTokens(result.tokens.accessToken, result.tokens.refreshToken);
   return result;
 }
 
-export function authLogout(): void {
-  clearToken();
+export async function authRefresh(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) { clearTokens(); return false; }
+    setTokens(json.data.accessToken, json.data.refreshToken);
+    return true;
+  } catch {
+    clearTokens();
+    return false;
+  }
+}
+
+export async function authLogout(): Promise<void> {
+  const refreshToken = getRefreshToken();
+  try {
+    await apiFetch<unknown>("/api/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken }) });
+  } catch { /* ignore */ }
+  clearTokens();
 }
 
 // ─── Project normalization ─────────────────────────────────────────────────
@@ -255,14 +296,303 @@ export async function sendChatMessage(
 
 /**
  * Triggers download of the project Markdown report.
- * Returns the markdown content as a string.
  */
 export async function downloadProjectReport(id: string): Promise<string> {
   const token = getToken();
   const headers: Record<string, string> = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
-
   const res = await fetch(`${API_BASE}/api/projects/${id}/report`, { headers });
   if (!res.ok) throw new Error("Failed to generate report.");
   return res.text();
+}
+
+// ─── Server Management ─────────────────────────────────────────────────────
+
+import type {
+  Server,
+  ServerApp,
+  ServerLog,
+  ServerDomain,
+  SslCert,
+  ServerAIAnswer,
+  ServerMetricSnapshot,
+  CreateServerPayload,
+} from "@/types/project";
+
+export async function fetchServers(): Promise<Server[]> {
+  try { return await apiFetch<Server[]>("/api/servers"); }
+  catch { return []; }
+}
+
+export async function fetchServerById(id: string): Promise<Server | null> {
+  try { return await apiFetch<Server>(`/api/servers/${id}`); }
+  catch { return null; }
+}
+
+export async function createServer(payload: CreateServerPayload): Promise<Server> {
+  return apiFetch<Server>("/api/servers", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function deleteServer(id: string): Promise<void> {
+  await apiFetch<unknown>(`/api/servers/${id}`, { method: "DELETE" });
+}
+
+export async function fetchServerHealth(id: string): Promise<{
+  server: Server;
+  apps: ServerApp[];
+  latestMetric: ServerMetricSnapshot | null;
+} | null> {
+  try { return await apiFetch(`/api/servers/${id}/health`); }
+  catch { return null; }
+}
+
+export async function fetchServerMetrics(id: string, limit = 60): Promise<ServerMetricSnapshot[]> {
+  try { return await apiFetch<ServerMetricSnapshot[]>(`/api/servers/${id}/metrics?limit=${limit}`); }
+  catch { return []; }
+}
+
+export async function fetchServerApps(id: string): Promise<ServerApp[]> {
+  try { return await apiFetch<ServerApp[]>(`/api/servers/${id}/apps`); }
+  catch { return []; }
+}
+
+export async function triggerAppAction(
+  serverId: string,
+  appName: string,
+  action: "start" | "stop" | "restart"
+): Promise<void> {
+  await apiFetch<unknown>(`/api/servers/${serverId}/apps/${encodeURIComponent(appName)}/action`, {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
+}
+
+export async function fetchServerLogs(
+  id: string,
+  opts: { appName?: string; level?: string; limit?: number } = {}
+): Promise<ServerLog[]> {
+  const params = new URLSearchParams();
+  if (opts.appName) params.set("appName", opts.appName);
+  if (opts.level)   params.set("level", opts.level);
+  if (opts.limit)   params.set("limit", String(opts.limit));
+  try { return await apiFetch<ServerLog[]>(`/api/servers/${id}/logs?${params}`); }
+  catch { return []; }
+}
+
+export async function fetchServerDomains(id: string): Promise<ServerDomain[]> {
+  try { return await apiFetch<ServerDomain[]>(`/api/servers/${id}/domains`); }
+  catch { return []; }
+}
+
+export async function addServerDomain(
+  serverId: string,
+  data: { domain: string; type: string; target: string }
+): Promise<ServerDomain> {
+  return apiFetch<ServerDomain>(`/api/servers/${serverId}/domains`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteServerDomain(serverId: string, domainId: string): Promise<void> {
+  await apiFetch<unknown>(`/api/servers/${serverId}/domains/${domainId}`, { method: "DELETE" });
+}
+
+export async function fetchServerSslCerts(id: string): Promise<SslCert[]> {
+  try { return await apiFetch<SslCert[]>(`/api/servers/${id}/ssl`); }
+  catch { return []; }
+}
+
+export async function addServerSslCert(
+  serverId: string,
+  data: { domain: string; provider?: string; autoRenew?: boolean }
+): Promise<SslCert> {
+  return apiFetch<SslCert>(`/api/servers/${serverId}/ssl`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function askServerQuestion(
+  serverId: string,
+  message: string
+): Promise<ServerAIAnswer> {
+  return apiFetch<ServerAIAnswer>(`/api/servers/${serverId}/ask`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
+
+// ─── Admin API ─────────────────────────────────────────────────────────────
+
+export interface AdminOverview {
+  totalUsers: number;
+  totalProjects: number;
+  totalServers: number;
+  activeUsers30d: number;
+  aiMessages: number;
+  uploads: number;
+  deployments: {
+    total: number;
+    failed: number;
+    running: number;
+    avgDeploymentMs: number;
+  };
+  system: { dbStatus: string; queueStatus: string; aiStatus: string };
+}
+
+export interface AdminUser {
+  id: string; name: string; email: string; role: string;
+  isActive: boolean; projectCount: number; serverCount: number;
+  createdAt: string; lastActive: string;
+}
+
+export interface AdminUsersResponse {
+  total: number; page: number; pages: number; users: AdminUser[];
+}
+
+export async function fetchAdminOverview(): Promise<AdminOverview> {
+  return apiFetch<AdminOverview>("/api/admin/overview");
+}
+
+export async function fetchAdminUsers(
+  opts: { page?: number; limit?: number; search?: string; role?: string } = {}
+): Promise<AdminUsersResponse> {
+  const p = new URLSearchParams();
+  if (opts.page)   p.set("page",   String(opts.page));
+  if (opts.limit)  p.set("limit",  String(opts.limit));
+  if (opts.search) p.set("search", opts.search);
+  if (opts.role)   p.set("role",   opts.role);
+  return apiFetch<AdminUsersResponse>(`/api/admin/users?${p}`);
+}
+
+export async function fetchAdminUserDetail(userId: string): Promise<unknown> {
+  return apiFetch(`/api/admin/users/${userId}`);
+}
+
+export async function adminSetUserStatus(userId: string, isActive: boolean): Promise<void> {
+  await apiFetch<unknown>(`/api/admin/users/${userId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ isActive }),
+  });
+}
+
+export async function adminSetUserRole(userId: string, role: string): Promise<void> {
+  await apiFetch<unknown>(`/api/admin/users/${userId}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function adminDeleteUser(userId: string): Promise<void> {
+  await apiFetch<unknown>(`/api/admin/users/${userId}`, { method: "DELETE" });
+}
+
+export async function fetchAdminUsage(days = 30): Promise<unknown> {
+  return apiFetch(`/api/admin/usage?days=${days}`);
+}
+
+// ─── Deployment Execution API (Phase 6) ────────────────────────────────────
+
+import type {
+  DeploymentRun,
+  DeploymentLog,
+  DeploymentPlan,
+} from "@/types/project";
+
+export interface CreateDeploymentPayload {
+  projectId:   string;
+  serverId:    string;
+  branch?:     string;
+  environment?: string;
+}
+
+export interface DeploymentListResponse {
+  deployments: DeploymentRun[];
+  nextCursor:  string | null;
+}
+
+export interface DeploymentLogsResponse {
+  logs:       DeploymentLog[];
+  nextCursor: string | null;
+}
+
+export async function apiCreateDeployment(payload: CreateDeploymentPayload): Promise<DeploymentRun> {
+  return apiFetch<DeploymentRun>("/api/deployments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function apiListDeployments(
+  projectId: string,
+  cursor?: string,
+  limit = 20
+): Promise<DeploymentListResponse> {
+  const p = new URLSearchParams({ projectId, limit: String(limit) });
+  if (cursor) p.set("cursor", cursor);
+  try {
+    return await apiFetch<DeploymentListResponse>(`/api/deployments?${p}`);
+  } catch {
+    return { deployments: [], nextCursor: null };
+  }
+}
+
+export async function apiGetDeployment(id: string): Promise<DeploymentRun | null> {
+  try { return await apiFetch<DeploymentRun>(`/api/deployments/${id}`); }
+  catch { return null; }
+}
+
+export async function apiGetDeploymentLogs(
+  id: string,
+  cursor?: string,
+  limit = 100
+): Promise<DeploymentLogsResponse> {
+  const p = new URLSearchParams({ limit: String(limit) });
+  if (cursor) p.set("cursor", cursor);
+  try {
+    return await apiFetch<DeploymentLogsResponse>(`/api/deployments/${id}/logs?${p}`);
+  } catch {
+    return { logs: [], nextCursor: null };
+  }
+}
+
+export async function apiGetDeploymentPlan(projectId: string): Promise<DeploymentPlan | null> {
+  try {
+    return await apiFetch<DeploymentPlan>(`/api/projects/${projectId}/deployment-plan`);
+  } catch {
+    return null;
+  }
+}
+
+export async function apiRollbackDeployment(deploymentId: string): Promise<DeploymentRun> {
+  return apiFetch<DeploymentRun>(`/api/deployments/${deploymentId}/rollback`, { method: "POST" });
+}
+
+/**
+ * Opens an SSE stream for live deployment logs.
+ * Returns an EventSource — caller must close it when done.
+ */
+export function openDeploymentLogStream(
+  deploymentId: string,
+  onLog: (log: DeploymentLog) => void,
+  onDone: (status: string) => void,
+  onError?: () => void
+): EventSource {
+  const token = getToken();
+  // EventSource doesn't support Authorization header — pass token as query param
+  const url = `${API_BASE}/api/deployments/${deploymentId}/logs/stream?token=${token ?? ""}`;
+  const es   = new EventSource(url);
+
+  es.onmessage = (e) => {
+    try { onLog(JSON.parse(e.data) as DeploymentLog); } catch { /* skip malformed */ }
+  };
+  es.addEventListener("done", (e: Event) => {
+    const data = JSON.parse((e as MessageEvent).data ?? "{}");
+    onDone(data.status ?? "UNKNOWN");
+    es.close();
+  });
+  es.onerror = () => { onError?.(); };
+
+  return es;
 }

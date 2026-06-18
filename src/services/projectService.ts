@@ -1,7 +1,7 @@
 /**
  * Project Service
  *
- * Business-logic layer that sits between components and the raw API layer.
+ * Business-logic layer between components and the raw API layer.
  * Components import from here — never directly from api.ts.
  */
 
@@ -23,5 +23,17 @@ export {
   authLogin,
   authSignup,
   authLogout,
+  authRefresh,
   getToken,
+  getRefreshToken,
+  setTokens,
+  clearTokens,
+  // Admin
+  fetchAdminOverview,
+  fetchAdminUsers,
+  fetchAdminUserDetail,
+  adminSetUserStatus,
+  adminSetUserRole,
+  adminDeleteUser,
+  fetchAdminUsage,
 } from "@/services/api";

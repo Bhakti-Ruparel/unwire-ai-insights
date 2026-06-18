@@ -11,11 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ServersIndexRouteImport } from './routes/servers.index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
+import { Route as ServersServerIdRouteImport } from './routes/servers.$serverId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
+import { Route as DeploymentsDeploymentIdRouteImport } from './routes/deployments.$deploymentId'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects.$projectId.index'
 import { Route as ProjectsProjectIdServicesRouteImport } from './routes/projects.$projectId.services'
+import { Route as ProjectsProjectIdDeploymentsRouteImport } from './routes/projects.$projectId.deployments'
 import { Route as ProjectsProjectIdDeploymentRouteImport } from './routes/projects.$projectId.deployment'
 import { Route as ProjectsProjectIdDependenciesRouteImport } from './routes/projects.$projectId.dependencies'
 import { Route as ProjectsProjectIdDatabaseRouteImport } from './routes/projects.$projectId.database'
@@ -34,9 +39,19 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServersIndexRoute = ServersIndexRouteImport.update({
+  id: '/servers/',
+  path: '/servers/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
@@ -44,9 +59,19 @@ const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   path: '/projects/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ServersServerIdRoute = ServersServerIdRouteImport.update({
+  id: '/servers/$serverId',
+  path: '/servers/$serverId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: '/projects/$projectId',
   path: '/projects/$projectId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeploymentsDeploymentIdRoute = DeploymentsDeploymentIdRouteImport.update({
+  id: '/deployments/$deploymentId',
+  path: '/deployments/$deploymentId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
@@ -58,6 +83,12 @@ const ProjectsProjectIdServicesRoute =
   ProjectsProjectIdServicesRouteImport.update({
     id: '/services',
     path: '/services',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ProjectsProjectIdDeploymentsRoute =
+  ProjectsProjectIdDeploymentsRouteImport.update({
+    id: '/deployments',
+    path: '/deployments',
     getParentRoute: () => ProjectsProjectIdRoute,
   } as any)
 const ProjectsProjectIdDeploymentRoute =
@@ -103,10 +134,14 @@ const ProjectsProjectIdApisRoute = ProjectsProjectIdApisRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/servers/$serverId': typeof ServersServerIdRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/servers/': typeof ServersIndexRoute
   '/projects/$projectId/apis': typeof ProjectsProjectIdApisRoute
   '/projects/$projectId/architecture': typeof ProjectsProjectIdArchitectureRoute
   '/projects/$projectId/backend': typeof ProjectsProjectIdBackendRoute
@@ -114,14 +149,19 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
   '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
   '/projects/$projectId/deployment': typeof ProjectsProjectIdDeploymentRoute
+  '/projects/$projectId/deployments': typeof ProjectsProjectIdDeploymentsRoute
   '/projects/$projectId/services': typeof ProjectsProjectIdServicesRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
+  '/servers/$serverId': typeof ServersServerIdRoute
   '/projects': typeof ProjectsIndexRoute
+  '/servers': typeof ServersIndexRoute
   '/projects/$projectId/apis': typeof ProjectsProjectIdApisRoute
   '/projects/$projectId/architecture': typeof ProjectsProjectIdArchitectureRoute
   '/projects/$projectId/backend': typeof ProjectsProjectIdBackendRoute
@@ -129,16 +169,21 @@ export interface FileRoutesByTo {
   '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
   '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
   '/projects/$projectId/deployment': typeof ProjectsProjectIdDeploymentRoute
+  '/projects/$projectId/deployments': typeof ProjectsProjectIdDeploymentsRoute
   '/projects/$projectId/services': typeof ProjectsProjectIdServicesRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/servers/$serverId': typeof ServersServerIdRoute
   '/projects/': typeof ProjectsIndexRoute
+  '/servers/': typeof ServersIndexRoute
   '/projects/$projectId/apis': typeof ProjectsProjectIdApisRoute
   '/projects/$projectId/architecture': typeof ProjectsProjectIdArchitectureRoute
   '/projects/$projectId/backend': typeof ProjectsProjectIdBackendRoute
@@ -146,6 +191,7 @@ export interface FileRoutesById {
   '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
   '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
   '/projects/$projectId/deployment': typeof ProjectsProjectIdDeploymentRoute
+  '/projects/$projectId/deployments': typeof ProjectsProjectIdDeploymentsRoute
   '/projects/$projectId/services': typeof ProjectsProjectIdServicesRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
@@ -153,10 +199,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/login'
     | '/signup'
+    | '/deployments/$deploymentId'
     | '/projects/$projectId'
+    | '/servers/$serverId'
     | '/projects/'
+    | '/servers/'
     | '/projects/$projectId/apis'
     | '/projects/$projectId/architecture'
     | '/projects/$projectId/backend'
@@ -164,14 +214,19 @@ export interface FileRouteTypes {
     | '/projects/$projectId/database'
     | '/projects/$projectId/dependencies'
     | '/projects/$projectId/deployment'
+    | '/projects/$projectId/deployments'
     | '/projects/$projectId/services'
     | '/projects/$projectId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/login'
     | '/signup'
+    | '/deployments/$deploymentId'
+    | '/servers/$serverId'
     | '/projects'
+    | '/servers'
     | '/projects/$projectId/apis'
     | '/projects/$projectId/architecture'
     | '/projects/$projectId/backend'
@@ -179,15 +234,20 @@ export interface FileRouteTypes {
     | '/projects/$projectId/database'
     | '/projects/$projectId/dependencies'
     | '/projects/$projectId/deployment'
+    | '/projects/$projectId/deployments'
     | '/projects/$projectId/services'
     | '/projects/$projectId'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/login'
     | '/signup'
+    | '/deployments/$deploymentId'
     | '/projects/$projectId'
+    | '/servers/$serverId'
     | '/projects/'
+    | '/servers/'
     | '/projects/$projectId/apis'
     | '/projects/$projectId/architecture'
     | '/projects/$projectId/backend'
@@ -195,16 +255,21 @@ export interface FileRouteTypes {
     | '/projects/$projectId/database'
     | '/projects/$projectId/dependencies'
     | '/projects/$projectId/deployment'
+    | '/projects/$projectId/deployments'
     | '/projects/$projectId/services'
     | '/projects/$projectId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   LoginRoute: typeof LoginRoute
   SignupRoute: typeof SignupRoute
+  DeploymentsDeploymentIdRoute: typeof DeploymentsDeploymentIdRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
+  ServersServerIdRoute: typeof ServersServerIdRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
+  ServersIndexRoute: typeof ServersIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -223,11 +288,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/servers/': {
+      id: '/servers/'
+      path: '/servers'
+      fullPath: '/servers/'
+      preLoaderRoute: typeof ServersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projects/': {
@@ -237,11 +316,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/servers/$serverId': {
+      id: '/servers/$serverId'
+      path: '/servers/$serverId'
+      fullPath: '/servers/$serverId'
+      preLoaderRoute: typeof ServersServerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/projects/$projectId': {
       id: '/projects/$projectId'
       path: '/projects/$projectId'
       fullPath: '/projects/$projectId'
       preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deployments/$deploymentId': {
+      id: '/deployments/$deploymentId'
+      path: '/deployments/$deploymentId'
+      fullPath: '/deployments/$deploymentId'
+      preLoaderRoute: typeof DeploymentsDeploymentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projects/$projectId/': {
@@ -256,6 +349,13 @@ declare module '@tanstack/react-router' {
       path: '/services'
       fullPath: '/projects/$projectId/services'
       preLoaderRoute: typeof ProjectsProjectIdServicesRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
+    '/projects/$projectId/deployments': {
+      id: '/projects/$projectId/deployments'
+      path: '/deployments'
+      fullPath: '/projects/$projectId/deployments'
+      preLoaderRoute: typeof ProjectsProjectIdDeploymentsRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
     '/projects/$projectId/deployment': {
@@ -318,6 +418,7 @@ interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdDatabaseRoute: typeof ProjectsProjectIdDatabaseRoute
   ProjectsProjectIdDependenciesRoute: typeof ProjectsProjectIdDependenciesRoute
   ProjectsProjectIdDeploymentRoute: typeof ProjectsProjectIdDeploymentRoute
+  ProjectsProjectIdDeploymentsRoute: typeof ProjectsProjectIdDeploymentsRoute
   ProjectsProjectIdServicesRoute: typeof ProjectsProjectIdServicesRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
 }
@@ -330,6 +431,7 @@ const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
   ProjectsProjectIdDatabaseRoute: ProjectsProjectIdDatabaseRoute,
   ProjectsProjectIdDependenciesRoute: ProjectsProjectIdDependenciesRoute,
   ProjectsProjectIdDeploymentRoute: ProjectsProjectIdDeploymentRoute,
+  ProjectsProjectIdDeploymentsRoute: ProjectsProjectIdDeploymentsRoute,
   ProjectsProjectIdServicesRoute: ProjectsProjectIdServicesRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
 }
@@ -339,10 +441,14 @@ const ProjectsProjectIdRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   LoginRoute: LoginRoute,
   SignupRoute: SignupRoute,
+  DeploymentsDeploymentIdRoute: DeploymentsDeploymentIdRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
+  ServersServerIdRoute: ServersServerIdRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
+  ServersIndexRoute: ServersIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

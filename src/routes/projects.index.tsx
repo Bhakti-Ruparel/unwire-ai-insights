@@ -3,6 +3,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { ProjectCard } from "@/components/ProjectCard";
 import { NewProjectModal } from "@/components/NewProjectModal";
 import { useProjects } from "@/context/ProjectContext";
+import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
 import { Plus, Sparkles, Loader2, AlertCircle } from "lucide-react";
 import { toast, Toaster } from "sonner";
@@ -15,13 +16,11 @@ export const Route = createFileRoute("/projects/")({
 
 function ProjectsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { projects, loading, error, loadProjects, addProject } = useProjects();
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Load projects on mount
-  useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
+  useEffect(() => { loadProjects(); }, [loadProjects]);
 
   async function handleProjectCreated(newProject: Project) {
     setModalOpen(false);
@@ -42,7 +41,7 @@ function ProjectsPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-              Unwire Your Projects
+              {user ? `${user.name}'s Projects` : "Your Projects"}
             </h1>
             <p className="mt-2 text-muted-foreground">
               Upload a repository and get an AI-powered understanding of your codebase.

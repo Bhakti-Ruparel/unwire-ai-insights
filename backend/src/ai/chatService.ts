@@ -205,44 +205,93 @@ export async function buildStructuredContext(
   if (
     lq.includes("deploy") || lq.includes("docker") || lq.includes("kubernetes") ||
     lq.includes("nginx") || lq.includes("ci/cd") || lq.includes("pipeline") ||
-    lq.includes("production") || lq.includes("infrastructure") || lq.includes("devops")
+    lq.includes("production") || lq.includes("infrastructure") || lq.includes("devops") ||
+    lq.includes("rollback") || lq.includes("deployment failed") || lq.includes("build failed")
   ) {
-    const deployment = await prisma.deploymentAnalysis.findUnique({
-      where: { projectId },
-      include: { issues: true, recommendations: true },
-    }).catch(() => null);
+    const [deployment, recentDeployments] = await Promise.all([
+      prisma.deploymentAnalysis.findUnique({
+        where: { projectId },
+        include: { issues: true, recommendations: true },
+      }).catch(() => null),
+      prisma.deployment.findMany({
+        where:   { projectId },
+        orderBy: { createdAt: "desc" },
+        take:    5,
+        include: {
+          steps: { orderBy: { order: "asc" } },
+          logs:  { orderBy: { timestamp: "desc" }, take: 20 },
+        },
+      }).catch(() => [] as any[]),
+    ]);
 
+    let answer = "";
+
+    // Recent execution deployments
+    if (recentDeployments.length > 0) {
+      const latest = recentDeployments[0];
+      answer += `**Recent deployments for ${project.name}:**\n\n`;
+
+      for (const dep of recentDeployments) {
+        const icon = dep.status === "SUCCESS" ? "✅" : dep.status === "FAILED" ? "❌" : dep.status === "RUNNING" ? "⏳" : "🔄";
+        const duration = dep.startedAt && dep.completedAt
+          ? `${Math.round((new Date(dep.completedAt).getTime() - new Date(dep.startedAt).getTime()) / 1000)}s`
+          : "—";
+        answer += `- ${icon} **v${dep.version}** → ${dep.serverName ?? "unknown server"} (${dep.status}) ${duration}\n`;
+      }
+      answer += "\n";
+
+      // If latest failed — show what step failed and last logs
+      if (latest.status === "FAILED") {
+        const failedStep = latest.steps?.find((s: any) => s.status === "failed");
+        answer += `**Latest deployment failed`;
+        if (failedStep) answer += ` at step: ${failedStep.name}`;
+        answer += `**\n`;
+        if (latest.error) answer += `Error: \`${latest.error}\`\n\n`;
+
+        const errorLogs = latest.logs?.filter((l: any) => l.level === "error").slice(0, 3) ?? [];
+        if (errorLogs.length > 0) {
+          answer += `**Recent error logs:**\n`;
+          answer += errorLogs.map((l: any) => `- \`${l.message}\``).join("\n") + "\n\n";
+        }
+
+        answer += `**To rollback:** Click the Rollback button in the Deployments tab, or ask "rollback deployment".\n`;
+      }
+
+      if (lq.includes("rollback")) {
+        if (recentDeployments.some((d: any) => d.status === "SUCCESS")) {
+          answer += `\n✅ **Rollback is possible** — there is a previous successful deployment available.\nGo to the Deployments tab and click the Rollback button on the latest deployment.`;
+        } else {
+          answer += `\n⚠️ **No successful deployment found** to rollback to for this project.`;
+        }
+      }
+
+      return answer;
+    }
+
+    // Fall back to deployment analysis (Phase 4)
     if (!deployment || deployment.status !== "complete") {
       return `Deployment analysis is not yet available for **${project.name}**. ` +
-        `Navigate to the Deployment tab to trigger an analysis.`;
+        `Navigate to the Deployment tab to trigger an analysis, or click Deploy to start your first deployment.`;
     }
 
     const detectedFiles = (deployment.filesDetected as Array<{ name: string; category: string }>) ?? [];
-    const criticals  = deployment.issues.filter((i) => i.severity === "CRITICAL");
-    const warnings   = deployment.issues.filter((i) => i.severity === "WARNING");
+    const criticals = deployment.issues.filter((i: any) => i.severity === "CRITICAL");
+    const warnings  = deployment.issues.filter((i: any) => i.severity === "WARNING");
 
-    let answer = `**Deployment readiness for ${project.name}** — Score: **${deployment.score}/100**\n\n`;
-
+    answer = `**Deployment readiness for ${project.name}** — Score: **${deployment.score}/100**\n\n`;
     if (detectedFiles.length > 0) {
       answer += `**Detected deployment files:**\n`;
       answer += detectedFiles.map((f) => `- ${f.name}`).join("\n") + "\n\n";
     } else {
       answer += `⚠️ No deployment configuration files found.\n\n`;
     }
-
     if (criticals.length > 0) {
-      answer += `**Critical issues (${criticals.length}):**\n`;
-      answer += criticals.map((i) => `- 🔴 ${i.message}`).join("\n") + "\n\n";
+      answer += `**Critical issues:**\n`;
+      answer += criticals.map((i: any) => `- 🔴 ${i.message}`).join("\n") + "\n\n";
     }
-
     if (warnings.length > 0) {
-      answer += `**Warnings (${warnings.length}):**\n`;
-      answer += warnings.map((i) => `- ⚠️ ${i.message}`).join("\n") + "\n\n";
-    }
-
-    if (deployment.recommendations.length > 0) {
-      answer += `**Top recommendations:**\n`;
-      answer += deployment.recommendations.slice(0, 3).map((r) => `- **${r.title}**: ${r.description.slice(0, 100)}…`).join("\n");
+      answer += `**Warnings:**\n`;
+      answer += warnings.map((i: any) => `- ⚠️ ${i.message}`).join("\n");
     }
 
     return answer;

@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Logo } from "@/components/Logo";
 import { useState } from "react";
 import { authLogin } from "@/services/api";
+import { useAuth } from "@/context/AuthContext";
 import { toast, Toaster } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -11,6 +12,7 @@ export const Route = createFileRoute("/login")({
 
 function Login() {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,6 +22,7 @@ function Login() {
     setLoading(true);
     try {
       await authLogin({ email, password });
+      await refreshUser();          // load full profile into AuthContext
       toast.success("Welcome back!");
       navigate({ to: "/projects" });
     } catch (err: unknown) {

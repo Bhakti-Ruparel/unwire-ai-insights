@@ -156,10 +156,10 @@ export interface ProjectDetailResponse {
   backend: BackendInfo;
 }
 
-// ─── Deployment Intelligence ────────────────────────────────────────────────
+// ─── Deployment Intelligence (Phase 4 — analysis) ──────────────────────────
 
+export type DeploymentAnalysisStatus = "pending" | "processing" | "complete" | "failed";
 export type DeploymentSeverity = "INFO" | "WARNING" | "CRITICAL";
-export type DeploymentStatus   = "pending" | "processing" | "complete" | "failed";
 
 export interface DeploymentScoreCategory {
   score: number;
@@ -207,7 +207,7 @@ export interface DeploymentArchEdge {
 
 export interface DeploymentAnalysis {
   projectId:         string;
-  status:            DeploymentStatus;
+  status:            DeploymentAnalysisStatus;
   score:             number;
   scoreBreakdown:    Record<string, DeploymentScoreCategory>;
   filesDetected:     DeploymentFile[];
@@ -218,17 +218,171 @@ export interface DeploymentAnalysis {
   updatedAt:         string;
 }
 
-// ─── Auth ──────────────────────────────────────────────────────────────────
+// ─── Deployment Execution (Phase 6) ───────────────────────────────────────
 
-export interface AuthUser {
+export type DeploymentStatus = "QUEUED" | "RUNNING" | "SUCCESS" | "FAILED" | "ROLLED_BACK";
+export type DeploymentStepStatus = "pending" | "running" | "success" | "failed" | "skipped";
+
+export interface DeploymentStep {
+  id:          string;
+  name:        string;
+  status:      DeploymentStepStatus;
+  order:       number;
+  durationMs?: number | null;
+  error?:      string | null;
+}
+
+export interface DeploymentRun {
+  id:          string;
+  projectId:   string;
+  serverId:    string;
+  userId:      string;
+  version:     number;
+  status:      DeploymentStatus;
+  progress:    number;
+  branch:      string;
+  environment: string;
+  error?:      string | null;
+  startedAt?:  string | null;
+  completedAt?: string | null;
+  createdAt:   string;
+  projectName: string;
+  serverName:  string;
+  steps:       DeploymentStep[];
+}
+
+export interface DeploymentLog {
+  id:        string;
+  level:     string;
+  message:   string;
+  stepName:  string;
+  timestamp: string;
+}
+
+export interface DeploymentPlan {
+  runtime:              string;
+  packageManager:       string;
+  buildCommand:         string | null;
+  startCommand:         string;
+  port:                 number;
+  dockerRequired:       boolean;
+  dockerComposeNeeded:  boolean;
+  nginxNeeded:          boolean;
+  environmentVariables: Array<{ key: string; required: boolean; example: string; description: string }>;
+  detectedServices:     string[];
+  frontendFramework:    string | null;
+  backendFramework:     string | null;
+  database:             string | null;
+  warnings:             string[];
+}
+
+// ─── Server Management ─────────────────────────────────────────────────────
+
+export interface Server {
   id: string;
-  email: string;
   name: string;
+  host: string;
+  provider: string;
+  region: string;
+  status: "online" | "offline" | "degraded" | "unknown";
+  sshUser: string;
+  sshPort: number;
+  createdAt: string;
+  updatedAt: string;
+  appCount: number;
+  latestMetric?: ServerMetricSnapshot | null;
+}
+
+export interface ServerMetricSnapshot {
+  cpuPercent:  number;
+  ramPercent:  number;
+  diskPercent: number;
+  networkIn:   number;
+  networkOut:  number;
+  recordedAt:  string;
+}
+
+export interface ServerApp {
+  id:         string;
+  serverId:   string;
+  name:       string;
+  type:       string;
+  status:     "running" | "stopped" | "error" | "restarting";
+  port:       number | null;
+  pid:        number | null;
+  uptime:     string;
+  memory:     number;
+  cpu:        number;
+  lastAction: string;
+}
+
+export interface ServerLog {
+  id:        string;
+  serverId:  string;
+  appName:   string;
+  level:     "info" | "warn" | "error" | "debug";
+  message:   string;
+  timestamp: string;
+}
+
+export interface ServerDomain {
+  id:        string;
+  serverId:  string;
+  domain:    string;
+  type:      string;
+  target:    string;
+  status:    string;
   createdAt: string;
 }
 
+export interface SslCert {
+  id:               string;
+  serverId:         string;
+  domain:           string;
+  provider:         string;
+  status:           "active" | "pending" | "expired" | "error";
+  expiresAt:        string | null;
+  autoRenew:        boolean;
+  daysUntilExpiry:  number | null;
+}
+
+export interface ServerAIAnswer {
+  answer:  string;
+  usedAI:  boolean;
+  context: { logsAnalyzed: number; metricsAnalyzed: number };
+}
+
+export interface CreateServerPayload {
+  name:     string;
+  host:     string;
+  provider?: string;
+  region?:  string;
+  sshUser?: string;
+  sshPort?: number;
+}
+
+// ─── Auth ──────────────────────────────────────────────────────────────────
+
+export interface AuthUser {
+  id:        string;
+  email:     string;
+  name:      string;
+  role:      string;
+  isActive?: boolean;
+  avatarUrl?: string | null;
+  createdAt: string;
+  projectCount?: number;
+  serverCount?:  number;
+  organizations?: Array<{
+    id: string; name: string; slug: string; plan: string; role: string;
+  }>;
+}
+
 export interface AuthResult {
-  token: string;
+  tokens: {
+    accessToken:  string;
+    refreshToken: string;
+  };
   user: AuthUser;
 }
 

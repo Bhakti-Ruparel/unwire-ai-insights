@@ -34,14 +34,15 @@ export const Route = createFileRoute("/projects/$projectId")({
 
 // ── Sidebar tabs — AI Chat removed (it's now a slide-in panel) ─────────────
 const TABS = [
-  { key: "",             label: "Overview",      icon: LayoutGrid  },
-  { key: "architecture", label: "Architecture",  icon: Network     },
-  { key: "apis",         label: "APIs",          icon: Boxes       },
-  { key: "backend",      label: "Backend",       icon: Server      },
-  { key: "database",     label: "Database",      icon: Database    },
-  { key: "dependencies", label: "Dependencies",  icon: Package     },
-  { key: "services",     label: "Services",      icon: Zap         },
-  { key: "deployment",   label: "Deployment",    icon: Rocket      },
+  { key: "",             label: "Overview",     icon: LayoutGrid  },
+  { key: "architecture", label: "Architecture", icon: Network     },
+  { key: "apis",         label: "APIs",         icon: Boxes       },
+  { key: "backend",      label: "Backend",      icon: Server      },
+  { key: "database",     label: "Database",     icon: Database    },
+  { key: "dependencies", label: "Dependencies", icon: Package     },
+  { key: "services",     label: "Services",     icon: Zap         },
+  { key: "deployment",   label: "Deployment",   icon: Rocket      },
+  { key: "deployments",  label: "Deploys",      icon: Rocket      },
 ];
 
 function ProjectShell() {
