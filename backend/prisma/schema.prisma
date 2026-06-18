@@ -40,6 +40,9 @@ model Project {
   userId         String?
   user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  // Embedding status: "pending" | "processing" | "complete" | "failed" | "not_started"
+  embeddingStatus String     @default("not_started")
+
   // Relations
   stats          ProjectStats?
   apis           APIEndpoint[]
@@ -47,6 +50,8 @@ model Project {
   backend        BackendInfo?
   schema         SchemaTable[]
   externalServices ExternalService[]
+  chatSessions   ChatSession[]
+  deploymentAnalysis DeploymentAnalysis?
 
   @@map("projects")
 }
@@ -142,4 +147,210 @@ model SchemaTable {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@map("schema_tables")
+}
+
+// ─── Chat Session ──────────────────────────────────────────────────────────
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  projectId String
+  createdAt DateTime      @default(now())
+
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@map("chat_sessions")
+}
+
+// ─── Chat Message ──────────────────────────────────────────────────────────
+
+model ChatMessage {
+  id        String      @id @default(uuid())
+  sessionId String
+  role      String      // "user" | "assistant"
+  content   String
+  createdAt DateTime    @default(now())
+
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+// ─── Deployment Analysis ───────────────────────────────────────────────────
+
+model DeploymentAnalysis {
+  id              String             @id @default(uuid())
+  projectId       String             @unique
+  status          String             @default("pending")  // "pending"|"processing"|"complete"|"failed"
+  score           Int                @default(0)          // 0–100
+  filesDetected   Json               @default("[]")       // DetectedFile[]
+  scoreBreakdown  Json               @default("{}")       // ScoreBreakdown
+  architectureNodes Json             @default("[]")       // ArchNode[]
+  architectureEdges Json             @default("[]")       // ArchEdge[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  issues          DeploymentIssue[]
+  recommendations DeploymentRec[]
+
+  @@index([projectId])
+  @@map("deployment_analyses")
+}
+
+// ─── Deployment Issue ──────────────────────────────────────────────────────
+
+model DeploymentIssue {
+  id           String             @id @default(uuid())
+  analysisId   String
+  severity     String             // "INFO"|"WARNING"|"CRITICAL"
+  category     String             // "docker"|"ci_cd"|"security"|"config"|"nginx"|"kubernetes"
+  message      String
+  file         String             @default("")
+  line         Int?
+  suggestion   String             @default("")
+  createdAt    DateTime           @default(now())
+
+  analysis     DeploymentAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@map("deployment_issues")
+}
+
+// ─── Deployment Recommendation ────────────────────────────────────────────
+
+model DeploymentRec {
+  id           String             @id @default(uuid())
+  analysisId   String
+  priority     Int                @default(0)   // lower = higher priority
+  title        String
+  description  String
+  category     String
+  codeSnippet  String             @default("")
+  createdAt    DateTime           @default(now())
+
+  analysis     DeploymentAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@map("deployment_recs")
+}
+
+// ─── Server ────────────────────────────────────────────────────────────────
+
+model Server {
+  id           String       @id @default(uuid())
+  userId       String?
+  name         String
+  host         String                              // IP or hostname
+  provider     String       @default("custom")    // "aws"|"gcp"|"azure"|"digitalocean"|"custom"
+  region       String       @default("")
+  status       String       @default("unknown")   // "online"|"offline"|"degraded"|"unknown"
+  sshUser      String       @default("root")
+  sshPort      Int          @default(22)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  metrics      ServerMetric[]
+  applications ServerApp[]
+  logs         ServerLog[]
+  domains      ServerDomain[]
+  sslCerts     SslCert[]
+
+  @@index([userId])
+  @@map("servers")
+}
+
+// ─── Server Metric (time-series snapshot) ─────────────────────────────────
+
+model ServerMetric {
+  id          String   @id @default(uuid())
+  serverId    String
+  cpuPercent  Float    @default(0)
+  ramPercent  Float    @default(0)
+  diskPercent Float    @default(0)
+  networkIn   Float    @default(0)    // KB/s
+  networkOut  Float    @default(0)    // KB/s
+  recordedAt  DateTime @default(now())
+
+  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId, recordedAt])
+  @@map("server_metrics")
+}
+
+// ─── Server Application ────────────────────────────────────────────────────
+
+model ServerApp {
+  id          String   @id @default(uuid())
+  serverId    String
+  name        String
+  type        String   @default("node")    // "node"|"python"|"static"|"database"|"nginx"|"docker"
+  status      String   @default("stopped") // "running"|"stopped"|"error"|"restarting"
+  port        Int?
+  pid         Int?
+  uptime      String   @default("")
+  memory      Float    @default(0)         // MB
+  cpu         Float    @default(0)         // percent
+  lastAction  String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId])
+  @@map("server_apps")
+}
+
+// ─── Server Log ────────────────────────────────────────────────────────────
+
+model ServerLog {
+  id        String   @id @default(uuid())
+  serverId  String
+  appName   String   @default("")
+  level     String   @default("info")   // "info"|"warn"|"error"|"debug"
+  message   String
+  timestamp DateTime @default(now())
+
+  server    Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId, timestamp])
+  @@index([serverId, appName])
+  @@map("server_logs")
+}
+
+// ─── Domain ────────────────────────────────────────────────────────────────
+
+model ServerDomain {
+  id         String   @id @default(uuid())
+  serverId   String
+  domain     String
+  type       String   @default("A")       // "A"|"CNAME"|"AAAA"
+  target     String
+  status     String   @default("active") // "active"|"pending"|"error"
+  createdAt  DateTime @default(now())
+
+  server     Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId])
+  @@map("server_domains")
+}
+
+// ─── SSL Certificate ───────────────────────────────────────────────────────
+
+model SslCert {
+  id          String   @id @default(uuid())
+  serverId    String
+  domain      String
+  provider    String   @default("letsencrypt")
+  status      String   @default("pending") // "active"|"pending"|"expired"|"error"
+  expiresAt   DateTime?
+  autoRenew   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId])
+  @@map("ssl_certs")
 }

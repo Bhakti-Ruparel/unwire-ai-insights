@@ -14,6 +14,7 @@ import type {
   BackendInfo,
   ProjectOverview,
   ExternalService,
+  DeploymentAnalysis,
   CreateProjectPayload,
   AuthResult,
   LoginPayload,
@@ -211,6 +212,45 @@ export async function fetchProjectServices(id: string): Promise<ExternalService[
   } catch {
     return [];
   }
+}
+
+/**
+ * Fetches deployment intelligence analysis for a project.
+ */
+export async function fetchProjectDeployment(id: string): Promise<DeploymentAnalysis | null> {
+  try {
+    return await apiFetch<DeploymentAnalysis>(`/api/projects/${id}/deployment`);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Triggers a fresh deployment analysis (background job).
+ */
+export async function refreshProjectDeployment(id: string): Promise<void> {
+  try {
+    await apiFetch<unknown>(`/api/projects/${id}/deployment/refresh`, { method: "POST" });
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Sends a chat message to the project-specific RAG AI assistant.
+ */
+export async function sendChatMessage(
+  projectId: string,
+  message: string,
+  sessionId?: string
+): Promise<{ answer: string; sources: string[]; sessionId: string }> {
+  return await apiFetch<{ answer: string; sources: string[]; sessionId: string }>(
+    `/api/projects/${projectId}/chat`,
+    {
+      method: "POST",
+      body: JSON.stringify({ message, sessionId }),
+    }
+  );
 }
 
 /**

@@ -53,7 +53,7 @@ function Landing() {
             </div>
           </div>
           <div className="relative">
-            <ArchitectureDiagram />
+            <ArchitectureDiagram useLandingFallback />
           </div>
         </div>
       </section>

@@ -259,6 +259,22 @@ async function runAnalysis(
     const result = await analyzeProject(zipPath, projectId, projectName, alreadyExtracted);
     await persistAnalysisResult(projectId, result);
     console.log(`[analyzer] Project ${projectId} analysis complete.`);
+
+    // Trigger background embedding job (non-blocking)
+    import("../ai/ragService").then(({ embedProjectCode }) => {
+      embedProjectCode(projectId).catch((err) => {
+        console.error(`[analyzer] Failed embedding project ${projectId}:`, err);
+      });
+    }).catch((err) => {
+      console.error("[analyzer] Failed to import ragService:", err);
+    });
+
+    // Trigger background deployment analysis job (non-blocking)
+    import("../deployment/deploymentService").then(({ triggerDeploymentAnalysis }) => {
+      triggerDeploymentAnalysis(projectId);
+    }).catch((err) => {
+      console.error("[analyzer] Failed to import deploymentService:", err);
+    });
   } catch (err) {
     await prisma.project.update({
       where: { id: projectId },
@@ -288,6 +304,22 @@ async function runGitHubAnalysis(
     const result = await analyzeProject(sourceDir, projectId, projectName, /* alreadyExtracted */ true);
     await persistAnalysisResult(projectId, result);
     console.log(`[analyzer] GitHub project ${projectId} analysis complete.`);
+
+    // Trigger background embedding job (non-blocking)
+    import("../ai/ragService").then(({ embedProjectCode }) => {
+      embedProjectCode(projectId).catch((err) => {
+        console.error(`[analyzer] Failed embedding project ${projectId}:`, err);
+      });
+    }).catch((err) => {
+      console.error("[analyzer] Failed to import ragService:", err);
+    });
+
+    // Trigger background deployment analysis job (non-blocking)
+    import("../deployment/deploymentService").then(({ triggerDeploymentAnalysis }) => {
+      triggerDeploymentAnalysis(projectId);
+    }).catch((err) => {
+      console.error("[analyzer] Failed to import deploymentService:", err);
+    });
   } catch (err) {
     await prisma.project.update({
       where: { id: projectId },

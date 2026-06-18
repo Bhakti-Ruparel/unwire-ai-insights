@@ -16,6 +16,7 @@ import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects.$projectId.index'
 import { Route as ProjectsProjectIdServicesRouteImport } from './routes/projects.$projectId.services'
+import { Route as ProjectsProjectIdDeploymentRouteImport } from './routes/projects.$projectId.deployment'
 import { Route as ProjectsProjectIdDependenciesRouteImport } from './routes/projects.$projectId.dependencies'
 import { Route as ProjectsProjectIdDatabaseRouteImport } from './routes/projects.$projectId.database'
 import { Route as ProjectsProjectIdChatRouteImport } from './routes/projects.$projectId.chat'
@@ -57,6 +58,12 @@ const ProjectsProjectIdServicesRoute =
   ProjectsProjectIdServicesRouteImport.update({
     id: '/services',
     path: '/services',
+    getParentRoute: () => ProjectsProjectIdRoute,
+  } as any)
+const ProjectsProjectIdDeploymentRoute =
+  ProjectsProjectIdDeploymentRouteImport.update({
+    id: '/deployment',
+    path: '/deployment',
     getParentRoute: () => ProjectsProjectIdRoute,
   } as any)
 const ProjectsProjectIdDependenciesRoute =
@@ -106,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
   '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
   '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
+  '/projects/$projectId/deployment': typeof ProjectsProjectIdDeploymentRoute
   '/projects/$projectId/services': typeof ProjectsProjectIdServicesRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
@@ -120,6 +128,7 @@ export interface FileRoutesByTo {
   '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
   '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
   '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
+  '/projects/$projectId/deployment': typeof ProjectsProjectIdDeploymentRoute
   '/projects/$projectId/services': typeof ProjectsProjectIdServicesRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
 }
@@ -136,6 +145,7 @@ export interface FileRoutesById {
   '/projects/$projectId/chat': typeof ProjectsProjectIdChatRoute
   '/projects/$projectId/database': typeof ProjectsProjectIdDatabaseRoute
   '/projects/$projectId/dependencies': typeof ProjectsProjectIdDependenciesRoute
+  '/projects/$projectId/deployment': typeof ProjectsProjectIdDeploymentRoute
   '/projects/$projectId/services': typeof ProjectsProjectIdServicesRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
 }
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/chat'
     | '/projects/$projectId/database'
     | '/projects/$projectId/dependencies'
+    | '/projects/$projectId/deployment'
     | '/projects/$projectId/services'
     | '/projects/$projectId/'
   fileRoutesByTo: FileRoutesByTo
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/chat'
     | '/projects/$projectId/database'
     | '/projects/$projectId/dependencies'
+    | '/projects/$projectId/deployment'
     | '/projects/$projectId/services'
     | '/projects/$projectId'
   id:
@@ -182,6 +194,7 @@ export interface FileRouteTypes {
     | '/projects/$projectId/chat'
     | '/projects/$projectId/database'
     | '/projects/$projectId/dependencies'
+    | '/projects/$projectId/deployment'
     | '/projects/$projectId/services'
     | '/projects/$projectId/'
   fileRoutesById: FileRoutesById
@@ -245,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdServicesRouteImport
       parentRoute: typeof ProjectsProjectIdRoute
     }
+    '/projects/$projectId/deployment': {
+      id: '/projects/$projectId/deployment'
+      path: '/deployment'
+      fullPath: '/projects/$projectId/deployment'
+      preLoaderRoute: typeof ProjectsProjectIdDeploymentRouteImport
+      parentRoute: typeof ProjectsProjectIdRoute
+    }
     '/projects/$projectId/dependencies': {
       id: '/projects/$projectId/dependencies'
       path: '/dependencies'
@@ -297,6 +317,7 @@ interface ProjectsProjectIdRouteChildren {
   ProjectsProjectIdChatRoute: typeof ProjectsProjectIdChatRoute
   ProjectsProjectIdDatabaseRoute: typeof ProjectsProjectIdDatabaseRoute
   ProjectsProjectIdDependenciesRoute: typeof ProjectsProjectIdDependenciesRoute
+  ProjectsProjectIdDeploymentRoute: typeof ProjectsProjectIdDeploymentRoute
   ProjectsProjectIdServicesRoute: typeof ProjectsProjectIdServicesRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
 }
@@ -308,6 +329,7 @@ const ProjectsProjectIdRouteChildren: ProjectsProjectIdRouteChildren = {
   ProjectsProjectIdChatRoute: ProjectsProjectIdChatRoute,
   ProjectsProjectIdDatabaseRoute: ProjectsProjectIdDatabaseRoute,
   ProjectsProjectIdDependenciesRoute: ProjectsProjectIdDependenciesRoute,
+  ProjectsProjectIdDeploymentRoute: ProjectsProjectIdDeploymentRoute,
   ProjectsProjectIdServicesRoute: ProjectsProjectIdServicesRoute,
   ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
 }

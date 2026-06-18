@@ -43,6 +43,9 @@ router.post("/",          controller.createProject);
 // ZIP upload
 router.post("/:id/upload", upload.single("file"), controller.uploadProjectZip);
 
+// Project Chat
+router.post("/:id/chat", controller.chatProject);
+
 // Sub-resources
 router.get("/:id/overview",      controller.getProjectOverview);
 router.get("/:id/apis",          controller.getProjectAPIs);
@@ -51,5 +54,9 @@ router.get("/:id/backend",       controller.getProjectBackend);
 router.get("/:id/schema",        controller.getProjectSchema);
 router.get("/:id/services",      controller.getProjectServices);
 router.get("/:id/report",        controller.getProjectReport);
+
+// Deployment Intelligence
+router.get("/:id/deployment",           controller.getDeployment);
+router.post("/:id/deployment/refresh",  controller.refreshDeployment);
 
 export default router;

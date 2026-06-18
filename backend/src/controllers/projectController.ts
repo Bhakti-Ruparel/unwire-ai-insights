@@ -1,7 +1,9 @@
 import type { Request, Response } from "express";
 import * as projectService from "../services/projectService";
 import { generateProjectReport } from "../services/reportService";
+import { getDeploymentAnalysis, triggerDeploymentAnalysis } from "../deployment/deploymentService";
 import type { CreateProjectBody, ApiResponse } from "../models/Project";
+import { handleProjectChat } from "../ai/chatService";
 
 // ─── GET /api/projects ─────────────────────────────────────────────────────
 
@@ -180,5 +182,95 @@ export async function getProjectReport(req: Request, res: Response): Promise<voi
   } catch (err) {
     console.error("[getProjectReport]", err);
     res.status(500).json({ success: false, error: "Failed to generate report." });
+  }
+}
+
+// ─── POST /api/projects/:id/chat ──────────────────────────────────────────
+
+export async function chatProject(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { message, sessionId } = req.body as { message: string; sessionId?: string };
+    
+    if (!message || typeof message !== "string" || !message.trim()) {
+      res.status(400).json({ success: false, error: "Message is required." });
+      return;
+    }
+    
+    console.log(`[chatProject] project: ${id}, msg: "${message.slice(0, 60)}"`);
+    const chatResult = await handleProjectChat(id, message, sessionId);
+    
+    res.json({
+      success: true,
+      data: {
+        answer: chatResult.answer,
+        sources: chatResult.sources,
+        sessionId: chatResult.sessionId,
+      },
+    });
+  } catch (err) {
+    console.error("[chatProject]", err);
+    res.status(500).json({ success: false, error: "Failed to process chat query." });
+  }
+}
+
+// ─── GET /api/projects/:id/deployment ────────────────────────────────────
+
+export async function getDeployment(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+
+    // Check project exists
+    const project = await projectService.getProjectById(id);
+    if (!project) {
+      res.status(404).json({ success: false, error: "Project not found." });
+      return;
+    }
+
+    const data = await getDeploymentAnalysis(id);
+
+    if (!data) {
+      // Analysis hasn't run yet — trigger it now and return pending status
+      triggerDeploymentAnalysis(id);
+      res.json({
+        success: true,
+        data: {
+          projectId: id,
+          status: "pending",
+          score: 0,
+          scoreBreakdown: {},
+          filesDetected: [],
+          issues: [],
+          recommendations: [],
+          architectureNodes: [],
+          architectureEdges: [],
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error("[getDeployment]", err);
+    res.status(500).json({ success: false, error: "Failed to fetch deployment analysis." });
+  }
+}
+
+// ─── POST /api/projects/:id/deployment/refresh ────────────────────────────
+
+export async function refreshDeployment(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const project = await projectService.getProjectById(id);
+    if (!project) {
+      res.status(404).json({ success: false, error: "Project not found." });
+      return;
+    }
+    triggerDeploymentAnalysis(id);
+    res.json({ success: true, data: { message: "Deployment analysis queued." } });
+  } catch (err) {
+    console.error("[refreshDeployment]", err);
+    res.status(500).json({ success: false, error: "Failed to trigger deployment analysis." });
   }
 }

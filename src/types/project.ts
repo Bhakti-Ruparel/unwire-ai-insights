@@ -156,6 +156,68 @@ export interface ProjectDetailResponse {
   backend: BackendInfo;
 }
 
+// ─── Deployment Intelligence ────────────────────────────────────────────────
+
+export type DeploymentSeverity = "INFO" | "WARNING" | "CRITICAL";
+export type DeploymentStatus   = "pending" | "processing" | "complete" | "failed";
+
+export interface DeploymentScoreCategory {
+  score: number;
+  max:   number;
+  label: string;
+}
+
+export interface DeploymentIssue {
+  id:         string;
+  severity:   DeploymentSeverity;
+  category:   string;
+  message:    string;
+  file:       string;
+  line?:      number;
+  suggestion: string;
+}
+
+export interface DeploymentRecommendation {
+  id:          string;
+  priority:    number;
+  title:       string;
+  description: string;
+  category:    string;
+  codeSnippet: string;
+}
+
+export interface DeploymentFile {
+  name:     string;
+  path:     string;
+  category: string;
+}
+
+export interface DeploymentArchNode {
+  id:    string;
+  label: string;
+  sub:   string;
+  type:  "user" | "proxy" | "container" | "backend" | "database" | "external" | "ci_cd" | "cloud";
+}
+
+export interface DeploymentArchEdge {
+  from:   string;
+  to:     string;
+  label?: string;
+}
+
+export interface DeploymentAnalysis {
+  projectId:         string;
+  status:            DeploymentStatus;
+  score:             number;
+  scoreBreakdown:    Record<string, DeploymentScoreCategory>;
+  filesDetected:     DeploymentFile[];
+  issues:            DeploymentIssue[];
+  recommendations:   DeploymentRecommendation[];
+  architectureNodes: DeploymentArchNode[];
+  architectureEdges: DeploymentArchEdge[];
+  updatedAt:         string;
+}
+
 // ─── Auth ──────────────────────────────────────────────────────────────────
 
 export interface AuthUser {
