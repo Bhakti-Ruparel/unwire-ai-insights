@@ -10,6 +10,8 @@ import adminRoutes      from "./routes/adminRoutes";
 import deploymentRoutes from "./routes/deploymentRoutes";
 import { prisma } from "./database/db";
 import { authenticate, optionalAuth } from "./middleware/authenticate";
+import { globalLimiter, authLimiter, deploymentLimiter } from "./middleware/rateLimiter";
+import { requestLogger } from "./middleware/requestLogger";
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? "5000", 10);
@@ -44,12 +46,16 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Serve uploaded files statically (optional — for thumbnails, etc.)
+// Serve uploaded files statically
 app.use("/uploads", express.static(uploadsDir));
+
+// ─── Logging & rate limiting ───────────────────────────────────────────────
+app.use(requestLogger);
+app.use(globalLimiter);
 
 // ─── Routes ────────────────────────────────────────────────────────────────
 
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 
 // Attach user to request if token present (optional — never blocks)
 app.use(optionalAuth);
@@ -57,7 +63,7 @@ app.use(optionalAuth);
 app.use("/api/projects",     projectRoutes);
 app.use("/api/servers",      serverRoutes);
 app.use("/api/admin",        adminRoutes);
-app.use("/api/deployments",  deploymentRoutes);
+app.use("/api/deployments",  deploymentLimiter, deploymentRoutes);
 
 // Health check
 app.get("/health", (_req, res) => {

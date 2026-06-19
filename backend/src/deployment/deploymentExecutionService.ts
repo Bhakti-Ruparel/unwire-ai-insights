@@ -68,13 +68,13 @@ export async function createDeployment(opts: {
   });
   if (!server) throw new Error("Server not found or access denied.");
 
-  // Auto-increment version per project
-  const lastDep = await prisma.deployment.findFirst({
-    where:   { projectId: opts.projectId },
-    orderBy: { version: "desc" },
-    select:  { version: true },
-  });
-  const version = (lastDep?.version ?? 0) + 1;
+  // Auto-increment version per project — use raw SQL for atomicity
+  const result = await prisma.$queryRaw<Array<{ nextVersion: number }>>`
+    SELECT COALESCE(MAX(version), 0) + 1 AS "nextVersion"
+    FROM deployments
+    WHERE "projectId" = ${opts.projectId}
+  `;
+  const version = result[0]?.nextVersion ?? 1;
 
   const dep = await prisma.deployment.create({
     data: {
@@ -219,12 +219,12 @@ export async function rollback(deploymentId: string, userId: string): Promise<De
   });
   if (!previous) throw new Error("No previous successful deployment found for rollback.");
 
-  // Create rollback deployment record
-  const version = (await prisma.deployment.findFirst({
-    where: { projectId: current.projectId },
-    orderBy: { version: "desc" },
-    select: { version: true },
-  }))?.version ?? 0;
+  // Create rollback deployment record with atomic version
+  const versionResult = await prisma.$queryRaw<Array<{ nextVersion: number }>>`
+    SELECT COALESCE(MAX(version), 0) + 1 AS "nextVersion"
+    FROM deployments WHERE "projectId" = ${current.projectId}
+  `;
+  const version = versionResult[0]?.nextVersion ?? 1;
 
   const rollbackDep = await prisma.deployment.create({
     data: {

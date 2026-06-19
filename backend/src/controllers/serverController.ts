@@ -79,6 +79,16 @@ export async function pushMetrics(req: Request, res: Response): Promise<void> {
   } catch (err) { res.status(500).json({ success: false, error: "Failed to save metrics." }); }
 }
 
+// POST /api/servers/:id/heartbeat
+export async function pushHeartbeat(req: Request, res: Response): Promise<void> {
+  try {
+    await svc.updateServerStatus(req.params.id, "online");
+    res.json({ success: true, data: { message: "Heartbeat received." } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: "Failed to save heartbeat." });
+  }
+}
+
 // ─── GET /api/servers/:id/apps ─────────────────────────────────────────────
 export async function getServerApps(req: Request, res: Response): Promise<void> {
   try {
@@ -204,5 +214,15 @@ export async function askServer(req: Request, res: Response): Promise<void> {
   } catch (err) {
     console.error("[askServer]", err);
     res.status(500).json({ success: false, error: "Failed to get AI answer." });
+  }
+}
+
+// POST /api/servers/:id/regenerate-token
+export async function regenerateAgentToken(req: Request, res: Response): Promise<void> {
+  try {
+    const data = await svc.regenerateAgentToken(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: "Failed to regenerate agent token." });
   }
 }

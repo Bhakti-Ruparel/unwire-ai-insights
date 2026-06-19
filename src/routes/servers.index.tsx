@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { AuthGuard } from "@/components/AuthGuard";
 import {
   fetchServers, createServer, deleteServer,
 } from "@/services/api";
@@ -227,6 +228,7 @@ function ServersPage() {
   }
 
   return (
+    <AuthGuard>
     <div className="min-h-screen">
       <AppHeader />
       <Toaster theme="dark" position="bottom-right" />
@@ -281,5 +283,6 @@ function ServersPage() {
         onCreated={(s) => { setServers((prev) => [s, ...prev]); setModal(false); }}
       />
     </div>
+    </AuthGuard>
   );
 }

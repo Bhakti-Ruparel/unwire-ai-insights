@@ -13,7 +13,7 @@ export function SiteHeader() {
           <Link to="/projects" className="hover:text-foreground transition-colors">Dashboard</Link>
         </nav>
         <div className="flex items-center gap-2">
-          <Link to="/login" className="text-sm px-3 py-2 rounded-md text-muted-foreground hover:text-foreground">Sign in</Link>
+          <Link to="/login" search={{ returnTo: "" }} className="text-sm px-3 py-2 rounded-md text-muted-foreground hover:text-foreground">Sign in</Link>
           <Link to="/signup" className="text-sm px-4 py-2 rounded-md btn-primary-grad font-medium">Get started</Link>
         </div>
       </div>

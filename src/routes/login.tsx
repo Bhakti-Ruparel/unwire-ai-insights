@@ -7,12 +7,16 @@ import { toast, Toaster } from "sonner";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in · Unwire AI" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    returnTo: typeof search.returnTo === "string" ? search.returnTo : "",
+  }),
   component: Login,
 });
 
 function Login() {
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
+  const { returnTo } = Route.useSearch();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,9 +26,11 @@ function Login() {
     setLoading(true);
     try {
       await authLogin({ email, password });
-      await refreshUser();          // load full profile into AuthContext
+      await refreshUser();
       toast.success("Welcome back!");
-      navigate({ to: "/projects" });
+      // Redirect to original destination or projects
+      const dest = returnTo && returnTo.startsWith("/") ? returnTo : "/projects";
+      navigate({ to: dest } as any);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login failed.";
       toast.error(msg);

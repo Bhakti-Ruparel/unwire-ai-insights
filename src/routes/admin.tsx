@@ -370,7 +370,7 @@ function AdminPage() {
   // Guard — redirect non-admins
   useEffect(() => {
     if (!authLoading && user && !isAdmin) navigate({ to: "/projects" });
-    if (!authLoading && !user) navigate({ to: "/login" });
+    if (!authLoading && !user) navigate({ to: "/login", search: { returnTo: "/admin" } });
   }, [authLoading, user, isAdmin]);
 
   useEffect(() => {

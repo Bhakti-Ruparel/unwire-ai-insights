@@ -73,7 +73,7 @@ function Signup() {
       <GoogleButton />
       <p className="mt-6 text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link to="/login" className="text-foreground hover:underline">
+        <Link to="/login" search={{ returnTo: "" }} className="text-foreground hover:underline">
           Sign in
         </Link>
       </p>

@@ -104,7 +104,11 @@ export async function getUserDetail(userId: string) {
   const [user, projects, servers, usage] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      include: { orgMemberships: { include: { organization: true } } },
+      select: {
+        id: true, email: true, name: true, role: true,
+        isActive: true, createdAt: true,
+        orgMemberships: { include: { organization: { select: { id: true, name: true, plan: true } } } },
+      },
     }),
     prisma.project.findMany({
       where: { userId },

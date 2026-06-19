@@ -333,6 +333,7 @@ model Server {
   status         String  @default("unknown")
   sshUser        String  @default("root")
   sshPort        Int     @default(22)
+  agentToken     String  @unique                 // used by agent for push auth
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

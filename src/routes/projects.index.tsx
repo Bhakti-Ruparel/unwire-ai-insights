@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppHeader } from "@/components/AppHeader";
+import { AuthGuard } from "@/components/AuthGuard";
 import { ProjectCard } from "@/components/ProjectCard";
 import { NewProjectModal } from "@/components/NewProjectModal";
 import { useProjects } from "@/context/ProjectContext";
@@ -32,6 +33,7 @@ function ProjectsPage() {
   }
 
   return (
+    <AuthGuard>
     <div className="min-h-screen">
       <AppHeader />
       <Toaster theme="dark" position="bottom-right" />
@@ -111,5 +113,6 @@ function ProjectsPage() {
         onCreated={handleProjectCreated}
       />
     </div>
+    </AuthGuard>
   );
 }

@@ -29,7 +29,7 @@ export function AppHeader() {
 
   async function handleLogout() {
     await logout();
-    navigate({ to: "/login" });
+    navigate({ to: "/login", search: { returnTo: "" } });
   }
 
   // Avatar initials
@@ -144,7 +144,7 @@ export function AppHeader() {
               )}
             </div>
           ) : (
-            <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-secondary/40 transition">
+            <Link to="/login" search={{ returnTo: "" }} className="text-sm text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-secondary/40 transition">
               Sign in
             </Link>
           )}

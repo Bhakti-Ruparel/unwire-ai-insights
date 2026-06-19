@@ -4,6 +4,8 @@ import path from "path";
 import fs from "fs";
 import * as controller from "../controllers/projectController";
 import { authenticate } from "../middleware/authenticate";
+import { requireProjectOwnership } from "../middleware/requireOwnership";
+import { uploadLimiter } from "../middleware/rateLimiter";
 import { getDeploymentPlan } from "../controllers/deploymentController";
 
 const router = Router();
@@ -24,7 +26,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
+  limits: { fileSize: 200 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === "application/zip" || file.originalname.endsWith(".zip")) {
       cb(null, true);
@@ -36,29 +38,25 @@ const upload = multer({
 
 // ─── Routes ────────────────────────────────────────────────────────────────
 
-// Project CRUD (authenticate is optional — pass userId if token present)
-router.get("/",           controller.listProjects);
-router.get("/:id",        controller.getProject);
-router.post("/",          controller.createProject);
+// List & create — require authentication
+router.get("/",    authenticate, controller.listProjects);
+router.post("/",   authenticate, controller.createProject);
 
-// ZIP upload
-router.post("/:id/upload", upload.single("file"), controller.uploadProjectZip);
+// All single-project routes require authentication + ownership check
+router.get("/:id",        authenticate, requireProjectOwnership, controller.getProject);
+router.post("/:id/upload", authenticate, requireProjectOwnership, uploadLimiter, upload.single("file"), controller.uploadProjectZip);
+router.post("/:id/chat",   authenticate, requireProjectOwnership, controller.chatProject);
 
-// Project Chat
-router.post("/:id/chat", controller.chatProject);
-
-// Sub-resources
-router.get("/:id/overview",      controller.getProjectOverview);
-router.get("/:id/apis",          controller.getProjectAPIs);
-router.get("/:id/dependencies",  controller.getProjectDependencies);
-router.get("/:id/backend",       controller.getProjectBackend);
-router.get("/:id/schema",        controller.getProjectSchema);
-router.get("/:id/services",      controller.getProjectServices);
-router.get("/:id/report",        controller.getProjectReport);
-
-// Deployment Intelligence
-router.get("/:id/deployment",           controller.getDeployment);
-router.post("/:id/deployment/refresh",  controller.refreshDeployment);
-router.get("/:id/deployment-plan",      getDeploymentPlan);
+// Sub-resources — all require ownership
+router.get("/:id/overview",         authenticate, requireProjectOwnership, controller.getProjectOverview);
+router.get("/:id/apis",             authenticate, requireProjectOwnership, controller.getProjectAPIs);
+router.get("/:id/dependencies",     authenticate, requireProjectOwnership, controller.getProjectDependencies);
+router.get("/:id/backend",          authenticate, requireProjectOwnership, controller.getProjectBackend);
+router.get("/:id/schema",           authenticate, requireProjectOwnership, controller.getProjectSchema);
+router.get("/:id/services",         authenticate, requireProjectOwnership, controller.getProjectServices);
+router.get("/:id/report",           authenticate, requireProjectOwnership, controller.getProjectReport);
+router.get("/:id/deployment",       authenticate, requireProjectOwnership, controller.getDeployment);
+router.post("/:id/deployment/refresh", authenticate, requireProjectOwnership, controller.refreshDeployment);
+router.get("/:id/deployment-plan",  authenticate, requireProjectOwnership, getDeploymentPlan);
 
 export default router;

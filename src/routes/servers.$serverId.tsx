@@ -1,6 +1,7 @@
 import { createFileRoute, useParams, Link } from "@tanstack/react-router";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { AppHeader } from "@/components/AppHeader";
+import { AuthGuard } from "@/components/AuthGuard";
 import {
   fetchServerHealth, fetchServerLogs, fetchServerApps,
   fetchServerDomains, fetchServerSslCerts, triggerAppAction,
@@ -430,27 +431,32 @@ function ServerDashboard() {
   }, [loadAll]);
 
   if (loading) return (
-    <div className="min-h-screen"><AppHeader />
-      <div className="flex items-center justify-center h-64 text-muted-foreground gap-3">
-        <Loader2 className="h-6 w-6 animate-spin" /><span>Loading server…</span>
+    <AuthGuard>
+      <div className="min-h-screen"><AppHeader />
+        <div className="flex items-center justify-center h-64 text-muted-foreground gap-3">
+          <Loader2 className="h-6 w-6 animate-spin" /><span>Loading server…</span>
+        </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 
   if (error || !server) return (
-    <div className="min-h-screen"><AppHeader />
-      <div className="max-w-2xl mx-auto px-6 py-10">
-        <div className="flex items-center gap-3 glass rounded-xl p-5 border border-destructive/30 text-destructive">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <span className="text-sm">{error ?? "Server not found."}</span>
+    <AuthGuard>
+      <div className="min-h-screen"><AppHeader />
+        <div className="max-w-2xl mx-auto px-6 py-10">
+          <div className="flex items-center gap-3 glass rounded-xl p-5 border border-destructive/30 text-destructive">
+            <AlertCircle className="h-5 w-5 shrink-0" />
+            <span className="text-sm">{error ?? "Server not found."}</span>
+          </div>
         </div>
       </div>
-    </div>
+    </AuthGuard>
   );
 
   const statusColor = { online: "text-green-400", offline: "text-red-400", degraded: "text-yellow-400", unknown: "text-gray-400" };
 
   return (
+    <AuthGuard>
     <div className="min-h-screen">
       <AppHeader />
       <Toaster theme="dark" position="bottom-right" />
@@ -531,5 +537,6 @@ function ServerDashboard() {
         <DomainsSection serverId={server.id} />
       </main>
     </div>
+    </AuthGuard>
   );
 }

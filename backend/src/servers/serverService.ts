@@ -32,6 +32,8 @@ export interface ServerDTO {
   sshPort: number;
   createdAt: string;
   updatedAt: string;
+  agentTokenMasked?: string;
+  agentTokenLast6?: string;
   // Aggregated
   appCount: number;
   latestMetric?: MetricSnapshot | null;
@@ -90,6 +92,11 @@ export interface SslCertDTO {
   daysUntilExpiry: number | null;
 }
 
+export interface AgentTokenDTO {
+  agentTokenMasked: string;
+  agentTokenLast6: string;
+}
+
 // ─── Servers CRUD ──────────────────────────────────────────────────────────
 
 export async function getAllServers(userId?: string): Promise<ServerDTO[]> {
@@ -118,6 +125,8 @@ export async function getAllServers(userId?: string): Promise<ServerDTO[]> {
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
     appCount: s.applications.length,
+    agentTokenMasked: maskToken(s.agentToken),
+    agentTokenLast6: tokenLast6(s.agentToken),
     latestMetric: s.metrics[0]
       ? {
           cpuPercent:  s.metrics[0].cpuPercent,
@@ -153,6 +162,8 @@ export async function getServerById(id: string, userId?: string): Promise<Server
     sshPort: server.sshPort,
     createdAt: server.createdAt.toISOString(),
     updatedAt: server.updatedAt.toISOString(),
+    agentTokenMasked: maskToken(server.agentToken),
+    agentTokenLast6: tokenLast6(server.agentToken),
     appCount: server.applications.length,
     latestMetric: server.metrics[0]
       ? {
@@ -168,6 +179,7 @@ export async function getServerById(id: string, userId?: string): Promise<Server
 }
 
 export async function createServer(data: CreateServerDTO): Promise<ServerDTO> {
+  const agentToken = randomUUID();
   const server = await prisma.server.create({
     data: {
       id:       randomUUID(),
@@ -177,6 +189,7 @@ export async function createServer(data: CreateServerDTO): Promise<ServerDTO> {
       region:   data.region ?? "",
       sshUser:  data.sshUser ?? "root",
       sshPort:  data.sshPort ?? 22,
+      agentToken,
       userId:   data.userId ?? null,
       status:   "unknown",
     },
@@ -192,6 +205,8 @@ export async function createServer(data: CreateServerDTO): Promise<ServerDTO> {
     status: server.status, sshUser: server.sshUser, sshPort: server.sshPort,
     createdAt: server.createdAt.toISOString(),
     updatedAt: server.updatedAt.toISOString(),
+    agentTokenMasked: maskToken(server.agentToken),
+    agentTokenLast6: tokenLast6(server.agentToken),
     appCount: 0, latestMetric: null,
   };
 }
@@ -202,6 +217,18 @@ export async function deleteServer(id: string): Promise<void> {
 
 export async function updateServerStatus(id: string, status: string): Promise<void> {
   await prisma.server.update({ where: { id }, data: { status } });
+}
+
+export async function regenerateAgentToken(id: string): Promise<AgentTokenDTO> {
+  const server = await prisma.server.update({
+    where: { id },
+    data: { agentToken: randomUUID() },
+    select: { agentToken: true },
+  });
+  return {
+    agentTokenMasked: maskToken(server.agentToken),
+    agentTokenLast6: tokenLast6(server.agentToken),
+  };
 }
 
 // ─── Metrics ───────────────────────────────────────────────────────────────
@@ -397,4 +424,13 @@ export async function addSslCert(
     expiresAt: row.expiresAt?.toISOString() ?? null,
     autoRenew: row.autoRenew, daysUntilExpiry: null,
   };
+}
+
+function tokenLast6(token: string | null | undefined): string {
+  return token?.slice(-6) ?? "";
+}
+
+function maskToken(token: string | null | undefined): string {
+  const last6 = tokenLast6(token);
+  return last6 ? `******${last6}` : "";
 }
