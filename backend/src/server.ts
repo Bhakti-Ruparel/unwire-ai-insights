@@ -11,10 +11,15 @@ import deploymentRoutes from "./routes/deploymentRoutes";
 import agentRoutes      from "./routes/agentRoutes";
 import alertRoutes      from "./routes/alertRoutes";
 import orgRoutes        from "./routes/orgRoutes";
+import dashboardRoutes  from "./routes/dashboardRoutes";
 import { prisma } from "./database/db";
 import { authenticate, optionalAuth } from "./middleware/authenticate";
 import { globalLimiter, authLimiter, deploymentLimiter } from "./middleware/rateLimiter";
 import { requestLogger } from "./middleware/requestLogger";
+import { requestIdMiddleware } from "./middleware/requestId";
+import { initCache } from "./services/cacheService";
+import { setupGracefulShutdown, registerServer } from "./services/shutdown";
+import { logger } from "./services/logger";
 
 const app = express();
 const PORT = parseInt(process.env.PORT ?? "5000", 10);
@@ -53,6 +58,7 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use("/uploads", express.static(uploadsDir));
 
 // ─── Logging & rate limiting ───────────────────────────────────────────────
+app.use(requestIdMiddleware);
 app.use(requestLogger);
 app.use(globalLimiter);
 
@@ -70,6 +76,7 @@ app.use("/api/deployments",  deploymentLimiter, deploymentRoutes);
 app.use("/api/agent",        agentRoutes);
 app.use("/api/alerts",       alertRoutes);
 app.use("/api/org",          orgRoutes);
+app.use("/api/dashboard",   dashboardRoutes);
 
 // Health check
 app.get("/health", (_req, res) => {
@@ -99,22 +106,33 @@ app.use(
 async function start() {
   try {
     await prisma.$connect();
-    console.log("✓ Database connected");
+    logger.info("Database connected");
+
+    // Initialize Redis cache (non-blocking — degrades gracefully)
+    initCache();
 
     // Start BullMQ deployment worker (non-blocking, degrades gracefully without Redis)
     const { startDeploymentWorker } = await import("./queue/deploymentWorker");
     await startDeploymentWorker();
 
-    // Start autonomous monitoring engine (Phase 9)
-    const { startMonitoringEngine } = await import("./monitoring/monitoringEngine");
-    startMonitoringEngine();
+    // Start monitoring — prefer BullMQ worker, fall back to in-process engine
+    const { startMonitoringWorker } = await import("./monitoring/monitoringWorker");
+    const workerStarted = await startMonitoringWorker();
+    if (!workerStarted) {
+      const { startMonitoringEngine } = await import("./monitoring/monitoringEngine");
+      startMonitoringEngine();
+    }
 
-    app.listen(PORT, () => {
-      console.log(`✓ Server running on http://localhost:${PORT}`);
-      console.log(`  CORS origins: ${ALLOWED_ORIGINS.join(", ")}`);
+    const server = app.listen(PORT, () => {
+      logger.info(`Server running on http://localhost:${PORT}`);
+      logger.info(`CORS origins: ${ALLOWED_ORIGINS.join(", ")}`);
     });
+
+    // Register for graceful shutdown
+    registerServer(server);
+    setupGracefulShutdown();
   } catch (err) {
-    console.error("✗ Failed to start server:", err);
+    logger.error(`Failed to start server: ${err}`);
     process.exit(1);
   }
 }
