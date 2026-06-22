@@ -11,7 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard, FolderOpen, Server, Rocket, Activity,
   MonitorCheck, MessagesSquare, Clock, Shield, Settings,
-  Users, Building2, Bell, LogOut, ChevronDown,
+  Users, Building2, Bell, LogOut, ChevronDown, Cloud,
 } from "lucide-react";
 import { type ReactNode } from "react";
 import { GlobalAIAgent } from "@/components/GlobalAIAgent";
@@ -26,15 +26,16 @@ interface NavItem {
 }
 
 const MAIN_NAV: NavItem[] = [
-  { to: "/overview",     icon: LayoutDashboard, name: "Overview",      match: "/overview" },
-  { to: "/projects",     icon: FolderOpen,      name: "Projects",      match: "/projects" },
-  { to: "/servers",      icon: Server,          name: "Servers",       match: "/servers" },
-  { to: "/deployments",  icon: Rocket,          name: "Deployments",   match: "/deployments" },
-  { to: "/monitoring",   icon: MonitorCheck,    name: "Monitoring",    match: "/monitoring" },
-  { to: "/alerts",       icon: Bell,            name: "Alerts",        match: "/alerts" },
-  { to: "/assistant",    icon: MessagesSquare,  name: "AI Assistant",  match: "/assistant" },
-  { to: "/activity",     icon: Clock,           name: "Activity",      match: "/activity" },
-  { to: "/settings",     icon: Settings,        name: "Settings",      match: "/settings" },
+  { to: "/overview",        icon: LayoutDashboard, name: "Overview",        match: "/overview" },
+  { to: "/projects",        icon: FolderOpen,      name: "Projects",        match: "/projects" },
+  { to: "/servers",         icon: Server,          name: "Servers",         match: "/servers" },
+  { to: "/infrastructure",  icon: Cloud,           name: "Infrastructure",  match: "/infrastructure" },
+  { to: "/deployments",     icon: Rocket,          name: "Deployments",     match: "/deployments" },
+  { to: "/monitoring",      icon: MonitorCheck,    name: "Monitoring",      match: "/monitoring" },
+  { to: "/alerts",          icon: Bell,            name: "Alerts",          match: "/alerts" },
+  { to: "/assistant",       icon: MessagesSquare,  name: "AI Assistant",    match: "/assistant" },
+  { to: "/activity",        icon: Clock,           name: "Activity",        match: "/activity" },
+  { to: "/settings",        icon: Settings,        name: "Settings",        match: "/settings" },
 ];
 
 const ADMIN_NAV: NavItem[] = [

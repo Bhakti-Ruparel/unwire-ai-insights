@@ -772,3 +772,55 @@ export async function fetchAuditLogs(opts: { limit?: number } = {}): Promise<{ l
   if (opts.limit) params.set("limit", String(opts.limit));
   try { return await apiFetch(`/api/org/audit?${params.toString()}`); } catch { return { logs: [], nextCursor: null }; }
 }
+
+// ─── Multi-Cloud Infrastructure ───────────────────────────────────────────
+
+export interface InfraProvider {
+  type: string;
+  displayName: string;
+  fields: Array<{ key: string; label: string; type: string; placeholder?: string; required: boolean; options?: string[] }>;
+}
+
+export interface InfraConnection {
+  id: string; provider: string; name: string; status: string;
+  region: string; lastSyncAt: string | null; lastError: string | null;
+  resourceCount: number; createdAt: string;
+}
+
+export interface CloudResourceItem {
+  id: string; provider: string; resourceType: string; resourceId: string;
+  name: string; region: string; status: string; specs: any; metrics: any;
+  tags: any; connectionName: string; lastSeenAt: string;
+}
+
+export async function fetchInfraProviders(): Promise<InfraProvider[]> {
+  try { return await apiFetch<InfraProvider[]>("/api/infrastructure/providers"); } catch { return []; }
+}
+
+export async function fetchInfraConnections(): Promise<InfraConnection[]> {
+  try { return await apiFetch<InfraConnection[]>("/api/infrastructure/connections"); } catch { return []; }
+}
+
+export async function fetchInfraResources(opts: { provider?: string; status?: string; limit?: number } = {}): Promise<{ resources: CloudResourceItem[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (opts.provider) params.set("provider", opts.provider);
+  if (opts.status) params.set("status", opts.status);
+  if (opts.limit) params.set("limit", String(opts.limit));
+  try { return await apiFetch(`/api/infrastructure/resources?${params}`); } catch { return { resources: [], nextCursor: null }; }
+}
+
+export async function fetchInfraSummary(): Promise<{ connections: number; providers: Record<string, { total: number; running: number; stopped: number }> }> {
+  try { return await apiFetch("/api/infrastructure/summary"); } catch { return { connections: 0, providers: {} }; }
+}
+
+export async function connectInfraProvider(provider: string, name: string, credentials: Record<string, string>): Promise<any> {
+  return apiFetch("/api/infrastructure/connect", { method: "POST", body: JSON.stringify({ provider, name, credentials }) });
+}
+
+export async function disconnectInfraProvider(connectionId: string): Promise<void> {
+  await apiFetch<unknown>("/api/infrastructure/disconnect", { method: "POST", body: JSON.stringify({ connectionId }) });
+}
+
+export async function syncInfraConnection(connectionId: string): Promise<any> {
+  return apiFetch(`/api/infrastructure/sync/${connectionId}`, { method: "POST" });
+}

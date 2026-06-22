@@ -12,6 +12,7 @@ import agentRoutes      from "./routes/agentRoutes";
 import alertRoutes      from "./routes/alertRoutes";
 import orgRoutes        from "./routes/orgRoutes";
 import dashboardRoutes  from "./routes/dashboardRoutes";
+import infraRoutes     from "./routes/infraRoutes";
 import { prisma } from "./database/db";
 import { authenticate, optionalAuth } from "./middleware/authenticate";
 import { globalLimiter, authLimiter, deploymentLimiter } from "./middleware/rateLimiter";
@@ -76,7 +77,8 @@ app.use("/api/deployments",  deploymentLimiter, deploymentRoutes);
 app.use("/api/agent",        agentRoutes);
 app.use("/api/alerts",       alertRoutes);
 app.use("/api/org",          orgRoutes);
-app.use("/api/dashboard",   dashboardRoutes);
+app.use("/api/dashboard",       dashboardRoutes);
+app.use("/api/infrastructure", infraRoutes);
 
 // Health check
 app.get("/health", (_req, res) => {

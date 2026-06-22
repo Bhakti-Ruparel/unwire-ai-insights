@@ -73,6 +73,7 @@ model Organization {
   subscription Subscription?
   invitations  Invitation[]
   apiKeys      ApiKey[]
+  infraConnections InfraConnection[]
 
   @@index([ownerId])
   @@map("organizations")
@@ -704,4 +705,56 @@ model ApiKey {
   @@index([hashedKey])
   @@index([prefix])
   @@map("api_keys")
+}
+
+// ─── Multi-Cloud: Infrastructure Connection ───────────────────────────────
+
+model InfraConnection {
+  id             String    @id @default(uuid())
+  organizationId String
+  provider       String                            // "aws"|"digitalocean"|"azure"|"gcp"|"hetzner"|"docker"
+  name           String                            // User-friendly name e.g. "Production AWS"
+  status         String    @default("pending")     // "pending"|"connected"|"error"|"disconnected"
+  region         String    @default("")            // Primary region or empty
+  encryptedCreds String    @default("")            // AES-256 encrypted credentials JSON
+  lastSyncAt     DateTime?
+  lastError      String?
+  metadata       Json      @default("{}")          // Provider-specific non-secret config
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  resources      CloudResource[]
+
+  @@index([organizationId])
+  @@index([provider])
+  @@map("infra_connections")
+}
+
+// ─── Multi-Cloud: Discovered Resource ─────────────────────────────────────
+
+model CloudResource {
+  id             String    @id @default(uuid())
+  connectionId   String
+  provider       String                            // Denormalized for fast queries
+  resourceType   String                            // "instance"|"container"|"database"|"load_balancer"|"volume"
+  resourceId     String                            // Provider-specific ID (e.g. i-0abc123, droplet-123)
+  name           String
+  region         String    @default("")
+  status         String    @default("unknown")     // "running"|"stopped"|"terminated"|"unknown"
+  specs          Json      @default("{}")          // { cpu, memory, disk, instanceType, etc. }
+  metrics        Json      @default("{}")          // Latest metrics snapshot
+  tags           Json      @default("[]")          // Provider tags/labels
+  lastSeenAt     DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  connection     InfraConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, resourceId])
+  @@index([connectionId])
+  @@index([provider, resourceType])
+  @@index([status])
+  @@map("cloud_resources")
 }

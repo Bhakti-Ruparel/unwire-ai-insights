@@ -43,6 +43,7 @@ import "../tools/deploymentTool";
 import "../tools/infrastructureHealthTool";
 import "../tools/incidentAnalysisTool";
 import "../tools/remediationTool";
+import "../tools/cloudInfrastructureTool";
 
 // ─── Main agent entry point ───────────────────────────────────────────────
 

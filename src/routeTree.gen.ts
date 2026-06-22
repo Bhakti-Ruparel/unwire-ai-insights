@@ -14,6 +14,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as InfrastructureRouteImport } from './routes/infrastructure'
 import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -59,6 +60,11 @@ const MonitoringRoute = MonitoringRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InfrastructureRoute = InfrastructureRouteImport.update({
+  id: '/infrastructure',
+  path: '/infrastructure',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AssistantRoute = AssistantRouteImport.update({
@@ -180,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
   '/assistant': typeof AssistantRoute
+  '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
   '/monitoring': typeof MonitoringRoute
   '/overview': typeof OverviewRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
   '/assistant': typeof AssistantRoute
+  '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
   '/monitoring': typeof MonitoringRoute
   '/overview': typeof OverviewRoute
@@ -236,6 +244,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
   '/assistant': typeof AssistantRoute
+  '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
   '/monitoring': typeof MonitoringRoute
   '/overview': typeof OverviewRoute
@@ -266,6 +275,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/assistant'
+    | '/infrastructure'
     | '/login'
     | '/monitoring'
     | '/overview'
@@ -294,6 +304,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/assistant'
+    | '/infrastructure'
     | '/login'
     | '/monitoring'
     | '/overview'
@@ -321,6 +332,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/assistant'
+    | '/infrastructure'
     | '/login'
     | '/monitoring'
     | '/overview'
@@ -350,6 +362,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AlertsRoute: typeof AlertsRoute
   AssistantRoute: typeof AssistantRoute
+  InfrastructureRoute: typeof InfrastructureRoute
   LoginRoute: typeof LoginRoute
   MonitoringRoute: typeof MonitoringRoute
   OverviewRoute: typeof OverviewRoute
@@ -398,6 +411,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/infrastructure': {
+      id: '/infrastructure'
+      path: '/infrastructure'
+      fullPath: '/infrastructure'
+      preLoaderRoute: typeof InfrastructureRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/assistant': {
@@ -585,6 +605,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AlertsRoute: AlertsRoute,
   AssistantRoute: AssistantRoute,
+  InfrastructureRoute: InfrastructureRoute,
   LoginRoute: LoginRoute,
   MonitoringRoute: MonitoringRoute,
   OverviewRoute: OverviewRoute,
