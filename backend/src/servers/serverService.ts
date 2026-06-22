@@ -34,6 +34,9 @@ export interface ServerDTO {
   updatedAt: string;
   agentTokenMasked?: string;
   agentTokenLast6?: string;
+  healthScore: number;
+  lastSeenAt: string | null;
+  lastSeenSecondsAgo: number | null;
   // Aggregated
   appCount: number;
   latestMetric?: MetricSnapshot | null;
@@ -45,7 +48,33 @@ export interface MetricSnapshot {
   diskPercent: number;
   networkIn: number;
   networkOut: number;
+  cpuCores?: number;
+  loadAverage?: number[];
+  memoryTotal?: number;
+  memoryUsed?: number;
+  memoryFree?: number;
+  diskTotal?: number;
+  diskUsed?: number;
   recordedAt: string;
+}
+
+export interface MetricIngestPayload {
+  cpuPercent?: number;
+  ramPercent?: number;
+  diskPercent?: number;
+  cpuUsage?: number;
+  cpuCores?: number;
+  loadAverage?: number[];
+  memoryUsage?: number;
+  memoryTotal?: number;
+  memoryUsed?: number;
+  memoryFree?: number;
+  diskUsage?: number;
+  diskTotal?: number;
+  diskUsed?: number;
+  networkIn?: number;
+  networkOut?: number;
+  timestamp?: string;
 }
 
 export interface AppDTO {
@@ -62,6 +91,17 @@ export interface AppDTO {
   lastAction: string;
 }
 
+export interface AppIngestPayload {
+  name: string;
+  type?: string;
+  status?: string;
+  port?: number | null;
+  pid?: number | null;
+  uptime?: string;
+  memory?: number;
+  cpu?: number;
+}
+
 export interface LogDTO {
   id: string;
   serverId: string;
@@ -69,6 +109,20 @@ export interface LogDTO {
   level: string;
   message: string;
   timestamp: string;
+}
+
+export interface LogIngestPayload {
+  appName?: string;
+  level?: string;
+  message: string;
+  timestamp?: Date | string;
+}
+
+export interface HeartbeatPayload {
+  serverId?: string;
+  agentVersion?: string;
+  timestamp?: string;
+  status?: string;
 }
 
 export interface DomainDTO {
@@ -109,35 +163,37 @@ export async function getAllServers(userId?: string): Promise<ServerDTO[]> {
         orderBy: { recordedAt: "desc" },
         take: 1,
       },
+      heartbeats: {
+        orderBy: { timestamp: "desc" },
+        take: 1,
+      },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  return servers.map((s) => ({
-    id: s.id,
-    name: s.name,
-    host: s.host,
-    provider: s.provider,
-    region: s.region,
-    status: s.status,
-    sshUser: s.sshUser,
-    sshPort: s.sshPort,
-    createdAt: s.createdAt.toISOString(),
-    updatedAt: s.updatedAt.toISOString(),
-    appCount: s.applications.length,
-    agentTokenMasked: maskToken(s.agentToken),
-    agentTokenLast6: tokenLast6(s.agentToken),
-    latestMetric: s.metrics[0]
-      ? {
-          cpuPercent:  s.metrics[0].cpuPercent,
-          ramPercent:  s.metrics[0].ramPercent,
-          diskPercent: s.metrics[0].diskPercent,
-          networkIn:   s.metrics[0].networkIn,
-          networkOut:  s.metrics[0].networkOut,
-          recordedAt:  s.metrics[0].recordedAt.toISOString(),
-        }
-      : null,
-  }));
+  return servers.map((s) => {
+    const latestMetric = s.metrics[0] ? toMetricSnapshot(s.metrics[0]) : null;
+    const heartbeat = s.heartbeats[0] ?? null;
+    return {
+      id: s.id,
+      name: s.name,
+      host: s.host,
+      provider: s.provider,
+      region: s.region,
+      status: s.status,
+      sshUser: s.sshUser,
+      sshPort: s.sshPort,
+      createdAt: s.createdAt.toISOString(),
+      updatedAt: s.updatedAt.toISOString(),
+      appCount: s.applications.length,
+      agentTokenMasked: maskToken(s.agentToken),
+      agentTokenLast6: tokenLast6(s.agentToken),
+      healthScore: computeHealthScore(latestMetric, s.status),
+      lastSeenAt: heartbeat?.timestamp.toISOString() ?? null,
+      lastSeenSecondsAgo: heartbeat ? Math.floor((Date.now() - heartbeat.timestamp.getTime()) / 1000) : null,
+      latestMetric,
+    };
+  });
 }
 
 export async function getServerById(id: string, userId?: string): Promise<ServerDTO | null> {
@@ -146,10 +202,14 @@ export async function getServerById(id: string, userId?: string): Promise<Server
     include: {
       applications: { select: { id: true } },
       metrics: { orderBy: { recordedAt: "desc" }, take: 1 },
+      heartbeats: { orderBy: { timestamp: "desc" }, take: 1 },
     },
   });
   if (!server) return null;
   if (userId && server.userId && server.userId !== userId) return null;
+
+  const latestMetric = server.metrics[0] ? toMetricSnapshot(server.metrics[0]) : null;
+  const heartbeat = server.heartbeats[0] ?? null;
 
   return {
     id: server.id,
@@ -164,17 +224,11 @@ export async function getServerById(id: string, userId?: string): Promise<Server
     updatedAt: server.updatedAt.toISOString(),
     agentTokenMasked: maskToken(server.agentToken),
     agentTokenLast6: tokenLast6(server.agentToken),
+    healthScore: computeHealthScore(latestMetric, server.status),
+    lastSeenAt: heartbeat?.timestamp.toISOString() ?? null,
+    lastSeenSecondsAgo: heartbeat ? Math.floor((Date.now() - heartbeat.timestamp.getTime()) / 1000) : null,
     appCount: server.applications.length,
-    latestMetric: server.metrics[0]
-      ? {
-          cpuPercent:  server.metrics[0].cpuPercent,
-          ramPercent:  server.metrics[0].ramPercent,
-          diskPercent: server.metrics[0].diskPercent,
-          networkIn:   server.metrics[0].networkIn,
-          networkOut:  server.metrics[0].networkOut,
-          recordedAt:  server.metrics[0].recordedAt.toISOString(),
-        }
-      : null,
+    latestMetric,
   };
 }
 
@@ -207,6 +261,9 @@ export async function createServer(data: CreateServerDTO): Promise<ServerDTO> {
     updatedAt: server.updatedAt.toISOString(),
     agentTokenMasked: maskToken(server.agentToken),
     agentTokenLast6: tokenLast6(server.agentToken),
+    healthScore: 0,
+    lastSeenAt: null,
+    lastSeenSecondsAgo: null,
     appCount: 0, latestMetric: null,
   };
 }
@@ -217,6 +274,34 @@ export async function deleteServer(id: string): Promise<void> {
 
 export async function updateServerStatus(id: string, status: string): Promise<void> {
   await prisma.server.update({ where: { id }, data: { status } });
+}
+
+export async function recordHeartbeat(serverId: string, payload: HeartbeatPayload, ip: string): Promise<void> {
+  const timestamp = payload.timestamp ? new Date(payload.timestamp) : new Date();
+  await prisma.serverHeartbeat.create({
+    data: {
+      id: randomUUID(),
+      serverId,
+      status: payload.status ?? "online",
+      agentVersion: payload.agentVersion ?? "",
+      ip,
+      timestamp,
+    },
+  });
+  await prisma.server.update({
+    where: { id: serverId },
+    data: { status: payload.status ?? "online" },
+  });
+
+  const old = await prisma.serverHeartbeat.findMany({
+    where: { serverId },
+    orderBy: { timestamp: "desc" },
+    skip: 2880,
+    select: { id: true },
+  });
+  if (old.length > 0) {
+    await prisma.serverHeartbeat.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
+  }
 }
 
 export async function regenerateAgentToken(id: string): Promise<AgentTokenDTO> {
@@ -235,10 +320,30 @@ export async function regenerateAgentToken(id: string): Promise<AgentTokenDTO> {
 
 export async function saveMetric(
   serverId: string,
-  metric: Omit<MetricSnapshot, "recordedAt">
+  metric: MetricIngestPayload
 ): Promise<void> {
+  const cpuPercent = metric.cpuPercent ?? metric.cpuUsage ?? 0;
+  const ramPercent = metric.ramPercent ?? metric.memoryUsage ?? percentage(metric.memoryUsed, metric.memoryTotal);
+  const diskPercent = metric.diskPercent ?? metric.diskUsage ?? percentage(metric.diskUsed, metric.diskTotal);
   await prisma.serverMetric.create({
-    data: { id: randomUUID(), serverId, ...metric },
+    data: {
+      id: randomUUID(),
+      serverId,
+      cpuPercent,
+      ramPercent,
+      diskPercent,
+      networkIn: metric.networkIn ?? 0,
+      networkOut: metric.networkOut ?? 0,
+      cpuUsage: cpuPercent,
+      cpuCores: metric.cpuCores ?? 0,
+      loadAverage: metric.loadAverage ?? [],
+      memoryTotal: metric.memoryTotal ?? 0,
+      memoryUsed: metric.memoryUsed ?? 0,
+      memoryFree: metric.memoryFree ?? 0,
+      diskTotal: metric.diskTotal ?? 0,
+      diskUsed: metric.diskUsed ?? 0,
+      recordedAt: metric.timestamp ? new Date(metric.timestamp) : new Date(),
+    },
   });
   // Prune old metrics — keep last 288 records (~24h at 5min intervals)
   const old = await prisma.serverMetric.findMany({
@@ -254,18 +359,50 @@ export async function saveMetric(
 
 export async function getMetricHistory(
   serverId: string,
-  limit = 60
+  limit = 60,
+  range: "1m" | "1h" | "24h" | "7d" = "1h"
 ): Promise<MetricSnapshot[]> {
+  const cappedLimit = Math.min(Math.max(limit, 1), 500);
   const rows = await prisma.serverMetric.findMany({
-    where: { serverId },
+    where: { serverId, recordedAt: { gte: rangeStart(range) } },
     orderBy: { recordedAt: "desc" },
-    take: limit,
+    take: cappedLimit,
   });
-  return rows.reverse().map((r) => ({
-    cpuPercent: r.cpuPercent, ramPercent: r.ramPercent,
-    diskPercent: r.diskPercent, networkIn: r.networkIn,
-    networkOut: r.networkOut, recordedAt: r.recordedAt.toISOString(),
-  }));
+  return rows.reverse().map(toMetricSnapshot);
+}
+
+export async function getMetricsWithPagination(
+  serverId: string,
+  opts: { page?: number; limit?: number; range?: "1m" | "1h" | "24h" | "7d" } = {}
+): Promise<{
+  metrics: MetricSnapshot[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pages: number;
+}> {
+  const pageNum = Math.max(1, opts.page ?? 1);
+  const pageSize = Math.min(Math.max(1, opts.limit ?? 100), 500);
+  const range = opts.range ?? "24h";
+
+  const where = { serverId, recordedAt: { gte: rangeStart(range) } };
+  const [metrics, total] = await Promise.all([
+    prisma.serverMetric.findMany({
+      where,
+      orderBy: { recordedAt: "desc" },
+      skip: (pageNum - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.serverMetric.count({ where }),
+  ]);
+
+  return {
+    metrics: metrics.reverse().map(toMetricSnapshot),
+    total,
+    page: pageNum,
+    pageSize,
+    pages: Math.ceil(total / pageSize),
+  };
 }
 
 // ─── Applications ──────────────────────────────────────────────────────────
@@ -295,6 +432,32 @@ export async function upsertApp(
   } else {
     await prisma.serverApp.create({
       data: { id: randomUUID(), serverId, ...app },
+    });
+  }
+}
+
+export async function replaceApps(serverId: string, apps: AppIngestPayload[]): Promise<void> {
+  const seen = new Set<string>();
+  for (const app of apps.slice(0, 200)) {
+    if (!app.name) continue;
+    seen.add(app.name);
+    await upsertApp(serverId, {
+      name: app.name,
+      type: app.type ?? "process",
+      status: app.status ?? "running",
+      port: app.port ?? null,
+      pid: app.pid ?? null,
+      uptime: app.uptime ?? "",
+      memory: app.memory ?? 0,
+      cpu: app.cpu ?? 0,
+      lastAction: "",
+    });
+  }
+
+  if (seen.size > 0) {
+    await prisma.serverApp.updateMany({
+      where: { serverId, name: { notIn: Array.from(seen) } },
+      data: { status: "stopped", updatedAt: new Date() },
     });
   }
 }
@@ -334,17 +497,71 @@ export async function getServerLogs(
   }));
 }
 
+export async function getServerLogsWithPagination(
+  serverId: string,
+  opts: {
+    page?: number;
+    limit?: number;
+    appName?: string;
+    level?: string;
+    range?: "1h" | "24h" | "7d";
+  } = {}
+): Promise<{
+  logs: LogDTO[];
+  total: number;
+  page: number;
+  pageSize: number;
+  pages: number;
+}> {
+  const pageNum = Math.max(1, opts.page ?? 1);
+  const pageSize = Math.min(Math.max(1, opts.limit ?? 50), 500);
+  const range = opts.range ?? "24h";
+
+  const where = {
+    serverId,
+    ...(opts.appName ? { appName: opts.appName } : {}),
+    ...(opts.level ? { level: opts.level } : {}),
+    timestamp: { gte: rangeStart(range) },
+  };
+
+  const [logs, total] = await Promise.all([
+    prisma.serverLog.findMany({
+      where,
+      orderBy: { timestamp: "desc" },
+      skip: (pageNum - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.serverLog.count({ where }),
+  ]);
+
+  return {
+    logs: logs.map((r) => ({
+      id: r.id,
+      serverId: r.serverId,
+      appName: r.appName,
+      level: r.level,
+      message: r.message,
+      timestamp: r.timestamp.toISOString(),
+    })),
+    total,
+    page: pageNum,
+    pageSize,
+    pages: Math.ceil(total / pageSize),
+  };
+}
+
 export async function appendLogs(
   serverId: string,
-  logs: Array<{ appName: string; level: string; message: string; timestamp?: Date }>
+  logs: LogIngestPayload[]
 ): Promise<void> {
   if (logs.length === 0) return;
+  const normalized = logs.slice(0, 500).filter((l) => l.message?.trim());
   await prisma.serverLog.createMany({
-    data: logs.map((l) => ({
+    data: normalized.map((l) => ({
       id: randomUUID(), serverId,
-      appName: l.appName, level: l.level,
+      appName: l.appName ?? "", level: normalizeLogLevel(l.level),
       message: l.message,
-      timestamp: l.timestamp ?? new Date(),
+      timestamp: normalizeTimestamp(l.timestamp),
     })),
   });
   // Keep last 10,000 logs per server
@@ -433,4 +650,68 @@ function tokenLast6(token: string | null | undefined): string {
 function maskToken(token: string | null | undefined): string {
   const last6 = tokenLast6(token);
   return last6 ? `******${last6}` : "";
+}
+
+function toMetricSnapshot(r: {
+  cpuPercent: number;
+  ramPercent: number;
+  diskPercent: number;
+  networkIn: number;
+  networkOut: number;
+  recordedAt: Date;
+  cpuCores?: number;
+  loadAverage?: number[];
+  memoryTotal?: number;
+  memoryUsed?: number;
+  memoryFree?: number;
+  diskTotal?: number;
+  diskUsed?: number;
+}): MetricSnapshot {
+  return {
+    cpuPercent: r.cpuPercent,
+    ramPercent: r.ramPercent,
+    diskPercent: r.diskPercent,
+    networkIn: r.networkIn,
+    networkOut: r.networkOut,
+    cpuCores: r.cpuCores,
+    loadAverage: r.loadAverage,
+    memoryTotal: r.memoryTotal,
+    memoryUsed: r.memoryUsed,
+    memoryFree: r.memoryFree,
+    diskTotal: r.diskTotal,
+    diskUsed: r.diskUsed,
+    recordedAt: r.recordedAt.toISOString(),
+  };
+}
+
+function percentage(used?: number, total?: number): number {
+  if (!used || !total || total <= 0) return 0;
+  return Math.min(100, Math.max(0, (used / total) * 100));
+}
+
+function rangeStart(range: "1m" | "1h" | "24h" | "7d"): Date {
+  const ms = range === "1m" ? 60_000 : range === "1h" ? 3_600_000 : range === "24h" ? 86_400_000 : 604_800_000;
+  return new Date(Date.now() - ms);
+}
+
+function computeHealthScore(metric: MetricSnapshot | null, status: string): number {
+  if (status === "offline") return 0;
+  if (!metric) return status === "online" ? 75 : 40;
+  const pressure = Math.max(metric.cpuPercent, metric.ramPercent, metric.diskPercent);
+  const base = status === "online" ? 100 : 70;
+  return Math.max(0, Math.min(100, Math.round(base - pressure * 0.45)));
+}
+
+function normalizeLogLevel(level?: string): string {
+  const value = (level ?? "info").toLowerCase();
+  if (["info", "warn", "error", "debug"].includes(value)) return value;
+  if (value === "warning") return "warn";
+  return "info";
+}
+
+function normalizeTimestamp(timestamp?: Date | string): Date {
+  if (!timestamp) return new Date();
+  if (timestamp instanceof Date) return timestamp;
+  const parsed = new Date(timestamp);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }

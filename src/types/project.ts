@@ -294,12 +294,19 @@ export interface Server {
 }
 
 export interface ServerMetricSnapshot {
-  cpuPercent:  number;
-  ramPercent:  number;
-  diskPercent: number;
-  networkIn:   number;
-  networkOut:  number;
-  recordedAt:  string;
+  cpuPercent:   number;
+  ramPercent:   number;
+  diskPercent:  number;
+  networkIn:    number;
+  networkOut:   number;
+  cpuCores?:    number;
+  loadAverage?: number[];
+  memoryTotal?: number;
+  memoryUsed?:  number;
+  memoryFree?:  number;
+  diskTotal?:   number;
+  diskUsed?:    number;
+  recordedAt:   string;
 }
 
 export interface ServerApp {

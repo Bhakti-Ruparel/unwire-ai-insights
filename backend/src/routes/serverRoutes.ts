@@ -3,6 +3,7 @@ import * as ctrl from "../controllers/serverController";
 import { authenticate } from "../middleware/authenticate";
 import { requireAgentOrOwnership, requireServerOwnerOrAdmin, requireServerOwnership } from "../middleware/requireOwnership";
 import { agentPushLimiter } from "../middleware/rateLimiter";
+import { subscribeToServerEvents } from "../servers/serverSSE";
 
 const router = Router();
 
@@ -20,6 +21,9 @@ router.get("/:id/health",   authenticate, requireServerOwnership, ctrl.getServer
 router.get("/:id/metrics",  authenticate, requireServerOwnership, ctrl.getServerMetrics);
 router.post("/:id/metrics", agentPushLimiter, requireAgentOrOwnership, ctrl.pushMetrics);
 router.post("/:id/heartbeat", agentPushLimiter, requireAgentOrOwnership, ctrl.pushHeartbeat);
+
+// Real-time updates via Server Sent Events
+router.get("/:id/events", authenticate, requireServerOwnership, subscribeToServerEvents);
 
 // Applications — user only
 router.get("/:id/apps",                  authenticate, requireServerOwnership, ctrl.getServerApps);

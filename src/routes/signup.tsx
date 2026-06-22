@@ -25,7 +25,7 @@ function Signup() {
       await authSignup({ name, email, password });
       await refreshUser();
       toast.success("Account created!");
-      navigate({ to: "/projects" });
+      navigate({ to: "/overview" });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Sign up failed.";
       toast.error(msg);

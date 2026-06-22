@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AppHeader } from "@/components/AppHeader";
+import { DashboardLayout } from "@/components/DashboardLayout";
 import { useAuth } from "@/context/AuthContext";
 import {
   fetchAdminOverview, fetchAdminUsers,
@@ -382,11 +382,11 @@ function AdminPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen"><AppHeader />
+      <DashboardLayout>
         <div className="flex items-center justify-center h-64 text-muted-foreground gap-3">
           <Loader2 className="h-6 w-6 animate-spin" /><span>Loading admin panel…</span>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -399,8 +399,7 @@ function AdminPage() {
   ];
 
   return (
-    <div className="min-h-screen">
-      <AppHeader />
+    <DashboardLayout>
       <Toaster theme="dark" position="bottom-right" />
 
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-6">
@@ -438,6 +437,6 @@ function AdminPage() {
         {tab === "users"    && <UsersTab />}
         {tab === "system"   && overview && <SystemTab data={overview} />}
       </main>
-    </div>
+    </DashboardLayout>
   );
 }

@@ -596,3 +596,93 @@ export function openDeploymentLogStream(
 
   return es;
 }
+
+// ─── AI Agent ──────────────────────────────────────────────────────────────
+
+export interface AgentChatResponse {
+  answer: string;
+  sources: string[];
+  sessionId: string;
+  intent?: "info" | "action";
+  mode?: "analyst" | "executor";
+  toolsUsed?: string[];
+  requiresApproval?: boolean;
+  approvalMessage?: string;
+}
+
+/**
+ * Sends a message to the global AI DevOps Agent.
+ */
+export async function sendAgentMessage(
+  message: string,
+  sessionId?: string
+): Promise<AgentChatResponse> {
+  return apiFetch<AgentChatResponse>("/api/agent/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, sessionId }),
+  });
+}
+
+// ─── Alerts & Notifications (Phase 9) ─────────────────────────────────────
+
+export interface AlertItem {
+  id: string;
+  type: string;
+  severity: "INFO" | "WARNING" | "CRITICAL";
+  title: string;
+  message: string;
+  recommendation: string;
+  status: "ACTIVE" | "ACKNOWLEDGED" | "RESOLVED";
+  serverId?: string;
+  projectId?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  resolvedAt?: string;
+}
+
+export interface AlertSummary {
+  critical: number;
+  warning: number;
+  resolved: number;
+  total: number;
+}
+
+export async function fetchAlerts(opts: {
+  status?: string; severity?: string; serverId?: string; limit?: number;
+} = {}): Promise<{ alerts: AlertItem[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (opts.status) params.set("status", opts.status);
+  if (opts.severity) params.set("severity", opts.severity);
+  if (opts.serverId) params.set("serverId", opts.serverId);
+  if (opts.limit) params.set("limit", String(opts.limit));
+  return apiFetch(`/api/alerts?${params.toString()}`);
+}
+
+export async function fetchAlertSummary(): Promise<AlertSummary> {
+  return apiFetch<AlertSummary>("/api/alerts/summary");
+}
+
+export async function acknowledgeAlert(id: string): Promise<void> {
+  await apiFetch<unknown>(`/api/alerts/${id}/acknowledge`, { method: "PATCH" });
+}
+
+export async function resolveAlertApi(id: string): Promise<void> {
+  await apiFetch<unknown>(`/api/alerts/${id}/resolve`, { method: "PATCH" });
+}
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export async function fetchNotifications(limit = 20): Promise<{ notifications: NotificationItem[]; unread: number }> {
+  return apiFetch(`/api/alerts/notifications?limit=${limit}`);
+}
+
+export async function markNotificationsRead(): Promise<void> {
+  await apiFetch<unknown>("/api/alerts/notifications/read-all", { method: "PATCH" });
+}

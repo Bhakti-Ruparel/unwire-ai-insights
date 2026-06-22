@@ -31,7 +31,7 @@ export function AuthGuard({ children, requireAdmin = false }: AuthGuardProps) {
     }
 
     if (requireAdmin && !isAdmin) {
-      navigate({ to: "/projects", search: {} } as any);
+      navigate({ to: "/servers", search: {} } as any);
     }
   }, [loading, isLoggedIn, isAdmin, requireAdmin]);
 

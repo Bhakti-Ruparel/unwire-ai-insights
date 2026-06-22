@@ -28,6 +28,9 @@ model User {
   ownedOrgs        Organization[]
   usageRecords     UsageRecord[]
   deployments      Deployment[]
+  alerts           Alert[]
+  incidents        Incident[]
+  notifications    Notification[]
 
   @@index([email])
   @@index([role])
@@ -340,6 +343,7 @@ model Server {
   user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   metrics      ServerMetric[]
+  heartbeats   ServerHeartbeat[]
   applications ServerApp[]
   logs         ServerLog[]
   domains      ServerDomain[]
@@ -361,12 +365,34 @@ model ServerMetric {
   diskPercent Float    @default(0)
   networkIn   Float    @default(0)
   networkOut  Float    @default(0)
+  cpuUsage    Float    @default(0)
+  cpuCores    Int      @default(0)
+  loadAverage Float[]  @default([])
+  memoryTotal Float    @default(0)
+  memoryUsed  Float    @default(0)
+  memoryFree  Float    @default(0)
+  diskTotal   Float    @default(0)
+  diskUsed    Float    @default(0)
   recordedAt  DateTime @default(now())
 
   server      Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
 
   @@index([serverId, recordedAt])
   @@map("server_metrics")
+}
+
+model ServerHeartbeat {
+  id           String   @id @default(uuid())
+  serverId     String
+  status       String   @default("online")
+  agentVersion String   @default("")
+  ip           String   @default("")
+  timestamp    DateTime @default(now())
+
+  server       Server   @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId, timestamp])
+  @@map("server_heartbeats")
 }
 
 // ─── Server Application ───────────────────────────────────────────────────
@@ -406,6 +432,7 @@ model ServerLog {
 
   @@index([serverId, timestamp])
   @@index([serverId, appName])
+  @@index([serverId, level, timestamp])
   @@map("server_logs")
 }
 
@@ -512,4 +539,80 @@ model DeploymentLog {
 
   @@index([deploymentId, timestamp])
   @@map("deployment_logs")
+}
+
+// ─── Phase 9: Alert ───────────────────────────────────────────────────────
+
+model Alert {
+  id             String    @id @default(uuid())
+  userId         String
+  organizationId String?
+  serverId       String?
+  projectId      String?
+  type           String                          // "cpu_high"|"ram_high"|"disk_high"|"app_crash"|"deploy_failed"|"server_offline"|"error_spike"
+  severity       String    @default("WARNING")   // "INFO"|"WARNING"|"CRITICAL"
+  title          String
+  message        String
+  recommendation String    @default("")
+  status         String    @default("ACTIVE")    // "ACTIVE"|"ACKNOWLEDGED"|"RESOLVED"
+  metadata       Json      @default("{}")
+  createdAt      DateTime  @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([serverId, createdAt])
+  @@index([severity, status])
+  @@map("alerts")
+}
+
+// ─── Phase 9: Incident ────────────────────────────────────────────────────
+
+model Incident {
+  id             String    @id @default(uuid())
+  userId         String
+  organizationId String?
+  serverId       String?
+  projectId      String?
+  title          String
+  description    String
+  severity       String    @default("WARNING")   // "INFO"|"WARNING"|"CRITICAL"
+  status         String    @default("OPEN")      // "OPEN"|"INVESTIGATING"|"RESOLVED"|"DISMISSED"
+  rootCause      String?
+  resolution     String?
+  aiAnalysis     Json      @default("{}")         // DevOpsAnalysis from reasoner
+  metadata       Json      @default("{}")
+  createdAt      DateTime  @default(now())
+  resolvedAt     DateTime?
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([serverId, status])
+  @@index([severity, status])
+  @@map("incidents")
+}
+
+// ─── Phase 9: Notification ────────────────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  type      String                             // "alert"|"incident"|"deployment"|"system"
+  title     String
+  message   String
+  channel   String    @default("in_app")       // "in_app"|"email"|"slack"|"webhook"
+  read      Boolean   @default(false)
+  metadata  Json      @default("{}")
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }

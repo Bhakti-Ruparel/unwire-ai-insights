@@ -28,8 +28,8 @@ function Login() {
       await authLogin({ email, password });
       await refreshUser();
       toast.success("Welcome back!");
-      // Redirect to original destination or projects
-      const dest = returnTo && returnTo.startsWith("/") ? returnTo : "/projects";
+      // Redirect to original destination or servers dashboard
+      const dest = returnTo && returnTo.startsWith("/") ? returnTo : "/overview";
       navigate({ to: dest } as any);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Login failed.";

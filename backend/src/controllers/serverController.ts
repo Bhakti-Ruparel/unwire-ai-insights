@@ -1,6 +1,13 @@
 import type { Request, Response } from "express";
 import * as svc from "../servers/serverService";
+import { getServerHealth as calculateServerHealth } from "../servers/healthService";
 import { askServerAI } from "../servers/serverAI";
+import {
+  broadcastMetricIfSubscribers,
+  broadcastHeartbeat,
+  broadcastLog,
+  broadcastStatusChange,
+} from "../servers/serverSSE";
 
 // ─── GET /api/servers ──────────────────────────────────────────────────────
 export async function listServers(req: Request, res: Response): Promise<void> {
@@ -46,25 +53,28 @@ export async function deleteServer(req: Request, res: Response): Promise<void> {
 // ─── GET /api/servers/:id/health ─────────────────────────────────────────
 export async function getServerHealth(req: Request, res: Response): Promise<void> {
   try {
-    const server = await svc.getServerById(req.params.id);
-    if (!server) { res.status(404).json({ success: false, error: "Server not found." }); return; }
-    const [apps, metrics] = await Promise.all([
-      svc.getServerApps(req.params.id),
-      svc.getMetricHistory(req.params.id, 1),
-    ]);
-    res.json({
-      success: true,
-      data: { server, apps, latestMetric: metrics[0] ?? null },
-    });
+    const health = await calculateServerHealth(req.params.id);
+    res.json({ success: true, data: health });
   } catch (err) { res.status(500).json({ success: false, error: "Failed to get health." }); }
 }
 
 // ─── GET /api/servers/:id/metrics ─────────────────────────────────────────
 export async function getServerMetrics(req: Request, res: Response): Promise<void> {
   try {
-    const limit = parseInt(req.query.limit as string) || 60;
-    const data = await svc.getMetricHistory(req.params.id, limit);
-    res.json({ success: true, data });
+    const page = parseInt(req.query.page as string) || undefined;
+    const limit = parseInt(req.query.limit as string) || undefined;
+    const range = (req.query.range as any) || undefined;
+
+    // If pagination requested, use paginated method
+    if (page !== undefined) {
+      const data = await svc.getMetricsWithPagination(req.params.id, { page, limit, range });
+      res.json({ success: true, data });
+    } else {
+      // Legacy: simple list with limit
+      const cappedLimit = Math.min(Math.max(limit ?? 60, 1), 500);
+      const data = await svc.getMetricHistory(req.params.id, cappedLimit, range);
+      res.json({ success: true, data });
+    }
   } catch (err) { res.status(500).json({ success: false, error: "Failed to get metrics." }); }
 }
 
@@ -75,6 +85,11 @@ export async function pushMetrics(req: Request, res: Response): Promise<void> {
     const { cpuPercent, ramPercent, diskPercent, networkIn, networkOut } = req.body;
     await svc.saveMetric(req.params.id, { cpuPercent, ramPercent, diskPercent, networkIn, networkOut });
     await svc.updateServerStatus(req.params.id, "online");
+    
+    // Broadcast to SSE subscribers
+    await broadcastMetricIfSubscribers(req.params.id);
+    broadcastStatusChange(req.params.id, "online");
+    
     res.json({ success: true, data: { message: "Metrics saved." } });
   } catch (err) { res.status(500).json({ success: false, error: "Failed to save metrics." }); }
 }
@@ -83,6 +98,10 @@ export async function pushMetrics(req: Request, res: Response): Promise<void> {
 export async function pushHeartbeat(req: Request, res: Response): Promise<void> {
   try {
     await svc.updateServerStatus(req.params.id, "online");
+    
+    // Broadcast to SSE subscribers
+    broadcastHeartbeat(req.params.id, "online");
+    
     res.json({ success: true, data: { message: "Heartbeat received." } });
   } catch (err) {
     res.status(500).json({ success: false, error: "Failed to save heartbeat." });
@@ -121,13 +140,26 @@ export async function appAction(req: Request, res: Response): Promise<void> {
 // ─── GET /api/servers/:id/logs ─────────────────────────────────────────────
 export async function getServerLogs(req: Request, res: Response): Promise<void> {
   try {
-    const { appName, level, limit } = req.query;
-    const data = await svc.getServerLogs(req.params.id, {
-      appName: appName as string | undefined,
-      level:   level   as string | undefined,
-      limit:   limit   ? parseInt(limit as string) : 100,
-    });
-    res.json({ success: true, data });
+    const page = parseInt(req.query.page as string) || undefined;
+    const appName = req.query.appName as string | undefined;
+    const level = req.query.level as string | undefined;
+    const limit = parseInt(req.query.limit as string) || undefined;
+    const range = (req.query.range as any) || undefined;
+
+    // If pagination requested, use paginated method
+    if (page !== undefined) {
+      const data = await svc.getServerLogsWithPagination(req.params.id, { page, appName, level, limit, range });
+      res.json({ success: true, data });
+    } else {
+      // Legacy: simple list with limit
+      const cappedLimit = Math.min(Math.max(limit ?? 100, 1), 500);
+      const data = await svc.getServerLogs(req.params.id, {
+        appName,
+        level,
+        limit: cappedLimit,
+      });
+      res.json({ success: true, data });
+    }
   } catch (err) { res.status(500).json({ success: false, error: "Failed to get logs." }); }
 }
 
@@ -146,6 +178,17 @@ export async function pushLogs(req: Request, res: Response): Promise<void> {
       ...l,
       timestamp: l.timestamp ? new Date(l.timestamp) : new Date(),
     })));
+    
+    // Broadcast to SSE subscribers
+    for (const log of logs) {
+      broadcastLog(req.params.id, {
+        appName: log.appName || "",
+        level: log.level || "info",
+        message: log.message,
+        timestamp: log.timestamp || new Date().toISOString(),
+      });
+    }
+    
     res.json({ success: true, data: { saved: logs.length } });
   } catch (err) { res.status(500).json({ success: false, error: "Failed to push logs." }); }
 }

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { AppHeader } from "@/components/AppHeader";
+import { DashboardLayout } from "@/components/DashboardLayout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { ProjectCard } from "@/components/ProjectCard";
 import { NewProjectModal } from "@/components/NewProjectModal";
@@ -34,19 +34,18 @@ function ProjectsPage() {
 
   return (
     <AuthGuard>
-    <div className="min-h-screen">
-      <AppHeader />
+    <DashboardLayout>
       <Toaster theme="dark" position="bottom-right" />
-      <main className="mx-auto max-w-7xl px-6 py-10">
+      <div className="max-w-[1000px] mx-auto px-6 py-6">
 
         {/* Page heading */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-              {user ? `${user.name}'s Projects` : "Your Projects"}
+            <h1 className="text-xl font-bold">
+              Projects
             </h1>
-            <p className="mt-2 text-muted-foreground">
-              Upload a repository and get an AI-powered understanding of your codebase.
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Upload a repository and get AI-powered codebase intelligence.
             </p>
           </div>
           <button
@@ -105,14 +104,14 @@ function ProjectsPage() {
             </button>
           </div>
         )}
-      </main>
 
       <NewProjectModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={handleProjectCreated}
       />
-    </div>
+      </div>
+    </DashboardLayout>
     </AuthGuard>
   );
 }

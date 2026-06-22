@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "../database/db";
+import { getServerHealth } from "./healthService";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -32,8 +33,8 @@ export async function askServerAI(
 ): Promise<ServerAIAnswer> {
   const lq = question.toLowerCase();
 
-  // Fetch context in parallel
-  const [server, recentLogs, recentMetrics, apps] = await Promise.all([
+  // Fetch context in parallel (including health status)
+  const [server, recentLogs, recentMetrics, apps, health] = await Promise.all([
     prisma.server.findUnique({ where: { id: serverId } }),
     prisma.serverLog.findMany({
       where: { serverId },
@@ -46,6 +47,7 @@ export async function askServerAI(
       take: 12,
     }),
     prisma.serverApp.findMany({ where: { serverId } }),
+    getServerHealth(serverId),
   ]);
 
   if (!server) {
@@ -56,7 +58,7 @@ export async function askServerAI(
   const apiKey = process.env.OPENAI_API_KEY;
   if (apiKey) {
     try {
-      const answer = await callOpenAI(question, server.name, recentLogs, recentMetrics, apps);
+      const answer = await callOpenAI(question, server.name, recentLogs, recentMetrics, apps, health);
       return {
         answer,
         usedAI: true,
@@ -68,7 +70,7 @@ export async function askServerAI(
   }
 
   // ── Structured fallback ──────────────────────────────────────────────────
-  const answer = buildStructuredAnswer(lq, server.name, recentLogs, recentMetrics, apps);
+  const answer = buildStructuredAnswer(lq, server.name, recentLogs, recentMetrics, apps, health);
   return {
     answer,
     usedAI: false,
@@ -83,7 +85,8 @@ async function callOpenAI(
   serverName: string,
   logs: any[],
   metrics: any[],
-  apps: any[]
+  apps: any[],
+  health: any
 ): Promise<string> {
   const OpenAI = (await import("openai")).default;
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -102,12 +105,17 @@ async function callOpenAI(
     .map((a) => `${a.name} (${a.type}): ${a.status}, port ${a.port ?? "—"}, memory ${a.memory.toFixed(0)}MB`)
     .join("\n");
 
+  const healthText = health ? `Health Status: ${health.status} (score: ${health.score}/100)\nReasons: ${health.reasons.join(", ") || "Server optimal"}` : "No health data";
+
   const systemPrompt = `You are an expert DevOps AI assistant for Unwire AI.
 You have access to real server data and must answer questions precisely.
 Always reference specific log entries or metrics when explaining issues.
 Be concise and actionable.`;
 
   const userMessage = `Server: ${serverName}
+
+Health Status:
+${healthText}
 
 Applications:
 ${appsText || "No applications registered."}
@@ -140,11 +148,25 @@ function buildStructuredAnswer(
   serverName: string,
   logs: any[],
   metrics: any[],
-  apps: any[]
+  apps: any[],
+  health: any
 ): string {
   const latestMetric = metrics[0];
   const errorLogs = logs.filter((l) => l.level === "error");
   const warnLogs  = logs.filter((l) => l.level === "warn");
+
+  // Health question
+  if (lq.includes("health") || lq.includes("status") || lq.includes("good")) {
+    if (!health) return `No health data available for **${serverName}** yet.`;
+    const statusEmoji = { healthy: "✅", warning: "⚠️", critical: "🔴", offline: "⛔" };
+    let answer = `**${serverName}** is **${health.status}** (score: ${health.score}/100).\n\n`;
+    if (health.reasons.length > 0) {
+      answer += `Issues detected:\n- ${health.reasons.join("\n- ")}`;
+    } else {
+      answer += `No issues detected. Server is running optimally.`;
+    }
+    return answer;
+  }
 
   // Restart / crash question
   if (lq.includes("restart") || lq.includes("crash") || lq.includes("down")) {

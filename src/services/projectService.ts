@@ -36,4 +36,6 @@ export {
   adminSetUserRole,
   adminDeleteUser,
   fetchAdminUsage,
+  // AI Agent
+  sendAgentMessage,
 } from "@/services/api";

@@ -1,6 +1,6 @@
 import { createFileRoute, useParams, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { AppHeader } from "@/components/AppHeader";
+import { DashboardLayout } from "@/components/DashboardLayout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { apiGetDeployment, apiRollbackDeployment, openDeploymentLogStream } from "@/services/api";
 import type { DeploymentRun, DeploymentLog } from "@/types/project";
@@ -112,26 +112,24 @@ function DeploymentDetailPage() {
 
   if (loading) return (
     <AuthGuard>
-      <div className="min-h-screen">
-        <AppHeader />
+      <DashboardLayout>
         <div className="flex items-center gap-3 justify-center h-64 text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" /><span>Loading deployment…</span>
         </div>
-      </div>
+      </DashboardLayout>
     </AuthGuard>
   );
 
   if (error || !dep) return (
     <AuthGuard>
-      <div className="min-h-screen">
-        <AppHeader />
+      <DashboardLayout>
         <div className="max-w-3xl mx-auto px-6 py-10">
           <div className="flex items-center gap-3 glass rounded-xl p-5 border border-destructive/30 text-destructive">
             <AlertCircle className="h-5 w-5 shrink-0" />
             <span className="text-sm">{error ?? "Deployment not found."}</span>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     </AuthGuard>
   );
 
@@ -142,8 +140,7 @@ function DeploymentDetailPage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen">
-        <AppHeader />
+      <DashboardLayout>
         <Toaster theme="dark" position="bottom-right" />
 
         <main className="mx-auto max-w-6xl px-6 py-6 space-y-6">
@@ -263,7 +260,9 @@ function DeploymentDetailPage() {
             </div>
           )}
         </main>
-      </div>
+      </DashboardLayout>
     </AuthGuard>
   );
 }
+
+

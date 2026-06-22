@@ -8,6 +8,8 @@ import authRoutes       from "./routes/authRoutes";
 import serverRoutes     from "./routes/serverRoutes";
 import adminRoutes      from "./routes/adminRoutes";
 import deploymentRoutes from "./routes/deploymentRoutes";
+import agentRoutes      from "./routes/agentRoutes";
+import alertRoutes      from "./routes/alertRoutes";
 import { prisma } from "./database/db";
 import { authenticate, optionalAuth } from "./middleware/authenticate";
 import { globalLimiter, authLimiter, deploymentLimiter } from "./middleware/rateLimiter";
@@ -64,6 +66,8 @@ app.use("/api/projects",     projectRoutes);
 app.use("/api/servers",      serverRoutes);
 app.use("/api/admin",        adminRoutes);
 app.use("/api/deployments",  deploymentLimiter, deploymentRoutes);
+app.use("/api/agent",        agentRoutes);
+app.use("/api/alerts",       alertRoutes);
 
 // Health check
 app.get("/health", (_req, res) => {
@@ -98,6 +102,10 @@ async function start() {
     // Start BullMQ deployment worker (non-blocking, degrades gracefully without Redis)
     const { startDeploymentWorker } = await import("./queue/deploymentWorker");
     await startDeploymentWorker();
+
+    // Start autonomous monitoring engine (Phase 9)
+    const { startMonitoringEngine } = await import("./monitoring/monitoringEngine");
+    startMonitoringEngine();
 
     app.listen(PORT, () => {
       console.log(`✓ Server running on http://localhost:${PORT}`);

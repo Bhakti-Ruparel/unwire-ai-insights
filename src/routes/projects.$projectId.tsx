@@ -1,7 +1,7 @@
 import {
   createFileRoute, Link, Outlet, useParams, useRouterState,
 } from "@tanstack/react-router";
-import { AppHeader } from "@/components/AppHeader";
+import { DashboardLayout } from "@/components/DashboardLayout";
 import { ChatPanel } from "@/components/ChatPanel";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useEffect, useState, useRef } from "react";
@@ -84,8 +84,7 @@ function ProjectShell() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen">
-        <AppHeader />
+      <DashboardLayout>
         <Toaster theme="dark" position="bottom-right" />
 
         <div className="mx-auto max-w-7xl px-6 py-6 grid lg:grid-cols-[240px_1fr] gap-6">
@@ -171,7 +170,7 @@ function ProjectShell() {
         </div>
 
         <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} project={project} />
-      </div>
+      </DashboardLayout>
     </AuthGuard>
   );
 }

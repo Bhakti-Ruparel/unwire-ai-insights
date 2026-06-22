@@ -10,8 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as OverviewRouteImport } from './routes/overview'
+import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AssistantRouteImport } from './routes/assistant'
+import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as ActivityRouteImport } from './routes/activity'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServersIndexRouteImport } from './routes/servers.index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
@@ -34,14 +39,39 @@ const SignupRoute = SignupRouteImport.update({
   path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OverviewRoute = OverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MonitoringRoute = MonitoringRouteImport.update({
+  id: '/monitoring',
+  path: '/monitoring',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssistantRoute = AssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlertsRoute = AlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActivityRoute = ActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -134,8 +164,13 @@ const ProjectsProjectIdApisRoute = ProjectsProjectIdApisRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
   '/admin': typeof AdminRoute
+  '/alerts': typeof AlertsRoute
+  '/assistant': typeof AssistantRoute
   '/login': typeof LoginRoute
+  '/monitoring': typeof MonitoringRoute
+  '/overview': typeof OverviewRoute
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
@@ -155,8 +190,13 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
   '/admin': typeof AdminRoute
+  '/alerts': typeof AlertsRoute
+  '/assistant': typeof AssistantRoute
   '/login': typeof LoginRoute
+  '/monitoring': typeof MonitoringRoute
+  '/overview': typeof OverviewRoute
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
   '/servers/$serverId': typeof ServersServerIdRoute
@@ -176,8 +216,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
   '/admin': typeof AdminRoute
+  '/alerts': typeof AlertsRoute
+  '/assistant': typeof AssistantRoute
   '/login': typeof LoginRoute
+  '/monitoring': typeof MonitoringRoute
+  '/overview': typeof OverviewRoute
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
@@ -199,8 +244,13 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/activity'
     | '/admin'
+    | '/alerts'
+    | '/assistant'
     | '/login'
+    | '/monitoring'
+    | '/overview'
     | '/signup'
     | '/deployments/$deploymentId'
     | '/projects/$projectId'
@@ -220,8 +270,13 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/activity'
     | '/admin'
+    | '/alerts'
+    | '/assistant'
     | '/login'
+    | '/monitoring'
+    | '/overview'
     | '/signup'
     | '/deployments/$deploymentId'
     | '/servers/$serverId'
@@ -240,8 +295,13 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/activity'
     | '/admin'
+    | '/alerts'
+    | '/assistant'
     | '/login'
+    | '/monitoring'
+    | '/overview'
     | '/signup'
     | '/deployments/$deploymentId'
     | '/projects/$projectId'
@@ -262,8 +322,13 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActivityRoute: typeof ActivityRoute
   AdminRoute: typeof AdminRoute
+  AlertsRoute: typeof AlertsRoute
+  AssistantRoute: typeof AssistantRoute
   LoginRoute: typeof LoginRoute
+  MonitoringRoute: typeof MonitoringRoute
+  OverviewRoute: typeof OverviewRoute
   SignupRoute: typeof SignupRoute
   DeploymentsDeploymentIdRoute: typeof DeploymentsDeploymentIdRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
@@ -281,6 +346,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/overview': {
+      id: '/overview'
+      path: '/overview'
+      fullPath: '/overview'
+      preLoaderRoute: typeof OverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/monitoring': {
+      id: '/monitoring'
+      path: '/monitoring'
+      fullPath: '/monitoring'
+      preLoaderRoute: typeof MonitoringRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -288,11 +367,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assistant': {
+      id: '/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AssistantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alerts': {
+      id: '/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/activity': {
+      id: '/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof ActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -441,8 +541,13 @@ const ProjectsProjectIdRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActivityRoute: ActivityRoute,
   AdminRoute: AdminRoute,
+  AlertsRoute: AlertsRoute,
+  AssistantRoute: AssistantRoute,
   LoginRoute: LoginRoute,
+  MonitoringRoute: MonitoringRoute,
+  OverviewRoute: OverviewRoute,
   SignupRoute: SignupRoute,
   DeploymentsDeploymentIdRoute: DeploymentsDeploymentIdRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
