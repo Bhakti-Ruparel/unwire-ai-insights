@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as LoginRouteImport } from './routes/login'
@@ -22,6 +23,7 @@ import { Route as ServersIndexRouteImport } from './routes/servers.index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
 import { Route as ServersServerIdRouteImport } from './routes/servers.$serverId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as DeploymentsDeploymentIdRouteImport } from './routes/deployments.$deploymentId'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects.$projectId.index'
 import { Route as ProjectsProjectIdServicesRouteImport } from './routes/projects.$projectId.services'
@@ -37,6 +39,11 @@ import { Route as ProjectsProjectIdApisRouteImport } from './routes/projects.$pr
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OverviewRoute = OverviewRouteImport.update({
@@ -97,6 +104,11 @@ const ServersServerIdRoute = ServersServerIdRouteImport.update({
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: '/projects/$projectId',
   path: '/projects/$projectId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeploymentsDeploymentIdRoute = DeploymentsDeploymentIdRouteImport.update({
@@ -171,8 +183,10 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/monitoring': typeof MonitoringRoute
   '/overview': typeof OverviewRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/servers/$serverId': typeof ServersServerIdRoute
   '/projects/': typeof ProjectsIndexRoute
@@ -197,8 +211,10 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/monitoring': typeof MonitoringRoute
   '/overview': typeof OverviewRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/servers/$serverId': typeof ServersServerIdRoute
   '/projects': typeof ProjectsIndexRoute
   '/servers': typeof ServersIndexRoute
@@ -223,8 +239,10 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/monitoring': typeof MonitoringRoute
   '/overview': typeof OverviewRoute
+  '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
   '/servers/$serverId': typeof ServersServerIdRoute
   '/projects/': typeof ProjectsIndexRoute
@@ -251,8 +269,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/monitoring'
     | '/overview'
+    | '/settings'
     | '/signup'
     | '/deployments/$deploymentId'
+    | '/invite/$token'
     | '/projects/$projectId'
     | '/servers/$serverId'
     | '/projects/'
@@ -277,8 +297,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/monitoring'
     | '/overview'
+    | '/settings'
     | '/signup'
     | '/deployments/$deploymentId'
+    | '/invite/$token'
     | '/servers/$serverId'
     | '/projects'
     | '/servers'
@@ -302,8 +324,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/monitoring'
     | '/overview'
+    | '/settings'
     | '/signup'
     | '/deployments/$deploymentId'
+    | '/invite/$token'
     | '/projects/$projectId'
     | '/servers/$serverId'
     | '/projects/'
@@ -329,8 +353,10 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MonitoringRoute: typeof MonitoringRoute
   OverviewRoute: typeof OverviewRoute
+  SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   DeploymentsDeploymentIdRoute: typeof DeploymentsDeploymentIdRoute
+  InviteTokenRoute: typeof InviteTokenRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
   ServersServerIdRoute: typeof ServersServerIdRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
@@ -344,6 +370,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/overview': {
@@ -428,6 +461,13 @@ declare module '@tanstack/react-router' {
       path: '/projects/$projectId'
       fullPath: '/projects/$projectId'
       preLoaderRoute: typeof ProjectsProjectIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deployments/$deploymentId': {
@@ -548,8 +588,10 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MonitoringRoute: MonitoringRoute,
   OverviewRoute: OverviewRoute,
+  SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   DeploymentsDeploymentIdRoute: DeploymentsDeploymentIdRoute,
+  InviteTokenRoute: InviteTokenRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
   ServersServerIdRoute: ServersServerIdRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,

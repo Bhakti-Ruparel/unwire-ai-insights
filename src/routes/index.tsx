@@ -122,7 +122,7 @@ function Landing() {
           <div className="absolute inset-0 -z-10" style={{ backgroundImage: "var(--gradient-hero)" }} />
           <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">Ready to unwire your codebase?</h2>
           <p className="mt-3 text-muted-foreground">Free to start. No credit card required.</p>
-          <Link to="/signup" className="mt-6 inline-flex btn-primary-grad px-6 py-3 rounded-md font-medium">Get started free</Link>
+          <Link to="/signup" search={{ returnTo: "" }} className="mt-6 inline-flex btn-primary-grad px-6 py-3 rounded-md font-medium">Get started free</Link>
         </div>
       </section>
 

@@ -686,3 +686,89 @@ export async function fetchNotifications(limit = 20): Promise<{ notifications: N
 export async function markNotificationsRead(): Promise<void> {
   await apiFetch<unknown>("/api/alerts/notifications/read-all", { method: "PATCH" });
 }
+
+// ─── Organization & Billing (Phase 10) ────────────────────────────────────
+
+export interface OrgData {
+  organization: {
+    id: string; name: string; slug: string; plan: string;
+    members: Array<{ id: string; role: string; user: { id: string; name: string; email: string } }>;
+  };
+  role: string;
+}
+
+export async function fetchOrganization(): Promise<OrgData | null> {
+  try { return await apiFetch<OrgData>("/api/org"); } catch { return null; }
+}
+
+export async function createOrganization(name: string): Promise<unknown> {
+  return apiFetch("/api/org", { method: "POST", body: JSON.stringify({ name }) });
+}
+
+export interface BillingData {
+  plan: string; status: string;
+  limits: { maxServers: number; maxProjects: number; maxMembers: number; maxAiRequestsPerDay: number; maxDeploymentsPerMonth: number; maxApiKeys: number; features: string[] };
+  usage: { servers: number; projects: number; members: number };
+}
+
+export async function fetchBilling(): Promise<BillingData | null> {
+  try { return await apiFetch<BillingData>("/api/org/billing"); } catch { return null; }
+}
+
+export async function upgradePlan(plan: string): Promise<void> {
+  await apiFetch<unknown>("/api/org/billing/upgrade", { method: "POST", body: JSON.stringify({ plan }) });
+}
+
+export async function inviteMember(email: string, role: string): Promise<unknown> {
+  return apiFetch("/api/org/invitations", { method: "POST", body: JSON.stringify({ email, role }) });
+}
+
+export async function fetchInvitations(): Promise<any[]> {
+  try { return await apiFetch<any[]>("/api/org/invitations"); } catch { return []; }
+}
+
+export async function acceptInvitation(token: string): Promise<void> {
+  await apiFetch<unknown>(`/api/org/invitations/${token}/accept`, { method: "POST" });
+}
+
+export interface InvitationInfo {
+  email: string;
+  organizationName: string;
+  role: string;
+  status: string;
+  expiresAt: string;
+  expired: boolean;
+}
+
+export async function getInvitationInfo(token: string): Promise<InvitationInfo | null> {
+  try {
+    // This endpoint is public (no auth), but apiFetch adds token if available
+    return await apiFetch<InvitationInfo>(`/api/org/invitations/${token}/info`);
+  } catch { return null; }
+}
+
+export async function removeMember(userId: string): Promise<void> {
+  await apiFetch<unknown>(`/api/org/members/${userId}`, { method: "DELETE" });
+}
+
+export async function updateMemberRole(userId: string, role: string): Promise<void> {
+  await apiFetch<unknown>(`/api/org/members/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) });
+}
+
+export async function fetchApiKeys(): Promise<any[]> {
+  try { return await apiFetch<any[]>("/api/org/api-keys"); } catch { return []; }
+}
+
+export async function createApiKeyApi(name: string, permissions: string[]): Promise<any> {
+  return apiFetch("/api/org/api-keys", { method: "POST", body: JSON.stringify({ name, permissions }) });
+}
+
+export async function revokeApiKeyApi(id: string): Promise<void> {
+  await apiFetch<unknown>(`/api/org/api-keys/${id}`, { method: "DELETE" });
+}
+
+export async function fetchAuditLogs(opts: { limit?: number } = {}): Promise<{ logs: any[]; nextCursor: string | null }> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set("limit", String(opts.limit));
+  try { return await apiFetch(`/api/org/audit?${params.toString()}`); } catch { return { logs: [], nextCursor: null }; }
+}

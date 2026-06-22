@@ -70,6 +70,9 @@ model Organization {
   members   OrganizationMember[]
   projects  Project[]
   servers   Server[]
+  subscription Subscription?
+  invitations  Invitation[]
+  apiKeys      ApiKey[]
 
   @@index([ownerId])
   @@map("organizations")
@@ -615,4 +618,90 @@ model Notification {
   @@index([userId, read])
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+// ─── Phase 10: Subscription ───────────────────────────────────────────────
+
+model Subscription {
+  id                    String    @id @default(uuid())
+  organizationId        String    @unique
+  plan                  String    @default("free")
+  status                String    @default("active")
+  startDate             DateTime  @default(now())
+  endDate               DateTime?
+  stripeCustomerId      String?
+  stripeSubscriptionId  String?
+  metadata              Json      @default("{}")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+// ─── Phase 10: Invitation ─────────────────────────────────────────────────
+
+model Invitation {
+  id             String    @id @default(uuid())
+  organizationId String
+  email          String
+  role           String    @default("DEVELOPER")
+  status         String    @default("PENDING")
+  invitedBy      String
+  token          String    @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([token])
+  @@map("invitations")
+}
+
+// ─── Phase 10: Audit Log ──────────────────────────────────────────────────
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String?
+  userId         String
+  action         String
+  resource       String   @default("")
+  description    String   @default("")
+  metadata       Json     @default("{}")
+  ipAddress      String   @default("")
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ─── Phase 10: API Key ────────────────────────────────────────────────────
+
+model ApiKey {
+  id             String    @id @default(uuid())
+  organizationId String
+  name           String
+  hashedKey      String    @unique
+  prefix         String
+  permissions    String[]  @default(["read"])
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  isActive       Boolean   @default(true)
+  createdBy      String
+  createdAt      DateTime  @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([hashedKey])
+  @@index([prefix])
+  @@map("api_keys")
 }

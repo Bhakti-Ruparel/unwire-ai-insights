@@ -34,6 +34,7 @@ const MAIN_NAV: NavItem[] = [
   { to: "/alerts",       icon: Bell,            name: "Alerts",        match: "/alerts" },
   { to: "/assistant",    icon: MessagesSquare,  name: "AI Assistant",  match: "/assistant" },
   { to: "/activity",     icon: Clock,           name: "Activity",      match: "/activity" },
+  { to: "/settings",     icon: Settings,        name: "Settings",      match: "/settings" },
 ];
 
 const ADMIN_NAV: NavItem[] = [

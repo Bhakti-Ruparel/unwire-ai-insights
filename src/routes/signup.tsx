@@ -7,12 +7,16 @@ import { AuthShell, Field, Divider, GoogleButton } from "./login";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Create account · Unwire AI" }] }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    returnTo: typeof search.returnTo === "string" ? search.returnTo : "",
+  }),
   component: Signup,
 });
 
 function Signup() {
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
+  const { returnTo } = Route.useSearch();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -25,7 +29,9 @@ function Signup() {
       await authSignup({ name, email, password });
       await refreshUser();
       toast.success("Account created!");
-      navigate({ to: "/overview" });
+      // Redirect to returnTo (invitation flow) or overview
+      const dest = returnTo && returnTo.startsWith("/") ? returnTo : "/overview";
+      navigate({ to: dest } as any);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Sign up failed.";
       toast.error(msg);

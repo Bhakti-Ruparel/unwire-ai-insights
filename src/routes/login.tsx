@@ -72,7 +72,7 @@ function Login() {
       <GoogleButton />
       <p className="mt-6 text-center text-sm text-muted-foreground">
         New here?{" "}
-        <Link to="/signup" className="text-foreground hover:underline">
+        <Link to="/signup" search={{ returnTo: "" }} className="text-foreground hover:underline">
           Create an account
         </Link>
       </p>
