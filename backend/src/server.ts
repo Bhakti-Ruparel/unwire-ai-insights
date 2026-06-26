@@ -13,6 +13,7 @@ import alertRoutes      from "./routes/alertRoutes";
 import orgRoutes        from "./routes/orgRoutes";
 import dashboardRoutes  from "./routes/dashboardRoutes";
 import infraRoutes     from "./routes/infraRoutes";
+import agentPushRoutes from "./routes/agentPushRoutes";
 import { prisma } from "./database/db";
 import { authenticate, optionalAuth } from "./middleware/authenticate";
 import { globalLimiter, authLimiter, deploymentLimiter } from "./middleware/rateLimiter";
@@ -79,6 +80,7 @@ app.use("/api/alerts",       alertRoutes);
 app.use("/api/org",          orgRoutes);
 app.use("/api/dashboard",       dashboardRoutes);
 app.use("/api/infrastructure", infraRoutes);
+app.use("/api/agent-push",    agentPushRoutes);
 
 // Health check
 app.get("/health", (_req, res) => {
@@ -116,6 +118,10 @@ async function start() {
     // Start BullMQ deployment worker (non-blocking, degrades gracefully without Redis)
     const { startDeploymentWorker } = await import("./queue/deploymentWorker");
     await startDeploymentWorker();
+
+    // Start ingestion worker for agent data (non-blocking)
+    const { startIngestionWorker } = await import("./queue/ingestionQueue");
+    await startIngestionWorker();
 
     // Start monitoring — prefer BullMQ worker, fall back to in-process engine
     const { startMonitoringWorker } = await import("./monitoring/monitoringWorker");

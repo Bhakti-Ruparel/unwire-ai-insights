@@ -232,7 +232,7 @@ export async function getServerById(id: string, userId?: string): Promise<Server
   };
 }
 
-export async function createServer(data: CreateServerDTO): Promise<ServerDTO> {
+export async function createServer(data: CreateServerDTO): Promise<ServerDTO & { agentToken: string }> {
   const agentToken = randomUUID();
   const server = await prisma.server.create({
     data: {
@@ -265,6 +265,7 @@ export async function createServer(data: CreateServerDTO): Promise<ServerDTO> {
     lastSeenAt: null,
     lastSeenSecondsAgo: null,
     appCount: 0, latestMetric: null,
+    agentToken, // Return plain token ONLY on creation (shown once)
   };
 }
 

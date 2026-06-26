@@ -55,6 +55,39 @@ export function setToken(token: string): void { localStorage.setItem(ACCESS_KEY,
 /** @deprecated use clearTokens */
 export function clearToken(): void { clearTokens(); }
 
+// ─── Refresh mutex (prevents concurrent refresh calls) ─────────────────────
+
+let _refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Ensures only one refresh request runs at a time.
+ * Concurrent callers wait for the same promise.
+ */
+function refreshOnce(): Promise<boolean> {
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = doRefresh().finally(() => { _refreshPromise = null; });
+  return _refreshPromise;
+}
+
+async function doRefresh(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) { clearTokens(); return false; }
+    setTokens(json.data.accessToken, json.data.refreshToken);
+    return true;
+  } catch {
+    clearTokens();
+    return false;
+  }
+}
+
 // ─── Shared fetch wrapper ──────────────────────────────────────────────────
 
 interface BackendResponse<T> {
@@ -73,9 +106,9 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
   let res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
-  // Auto-refresh on 401 (expired access token)
+  // Auto-refresh on 401 (expired access token) — uses mutex to prevent concurrent refreshes
   if (res.status === 401 && getRefreshToken()) {
-    const refreshed = await authRefresh();
+    const refreshed = await refreshOnce();
     if (refreshed) {
       const newToken = getToken();
       if (newToken) headers["Authorization"] = `Bearer ${newToken}`;
@@ -111,30 +144,20 @@ export async function authSignup(payload: SignupPayload): Promise<AuthResult> {
 }
 
 export async function authRefresh(): Promise<boolean> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
-    });
-    const json = await res.json();
-    if (!res.ok || !json.success) { clearTokens(); return false; }
-    setTokens(json.data.accessToken, json.data.refreshToken);
-    return true;
-  } catch {
-    clearTokens();
-    return false;
-  }
+  return refreshOnce();
 }
 
 export async function authLogout(): Promise<void> {
   const refreshToken = getRefreshToken();
-  try {
-    await apiFetch<unknown>("/api/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken }) });
-  } catch { /* ignore */ }
+  // Clear tokens FIRST to prevent 401→refresh loops during logout
   clearTokens();
+  try {
+    await fetch(`${API_BASE}/api/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+  } catch { /* ignore — tokens already cleared locally */ }
 }
 
 // ─── Project normalization ─────────────────────────────────────────────────

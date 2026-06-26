@@ -13,6 +13,7 @@
 
 import type { ExecutionPlan, ClassifiedIntent } from "./agentTypes";
 import { analyzeToolResults, formatAnalysisAsResponse, type DevOpsAnalysis } from "./devopsReasoner";
+import { routeAndGenerate } from "../providers/modelRouter";
 
 // ─── Response synthesis ───────────────────────────────────────────────────
 
@@ -53,11 +54,11 @@ export async function synthesizeResponse(
   const analysis = analyzeToolResults(plan, classified);
 
   // ── Step 2: Try LLM to polish the analysis into conversational response ──
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (apiKey && (toolResults.length > 0 || analysis.missingData.length > 0)) {
+  const hasAI = !!process.env.OPENROUTER_API_KEY || !!process.env.OPENAI_API_KEY || !!process.env.HUGGINGFACE_API_KEY;
+  if (hasAI && (toolResults.length > 0 || analysis.missingData.length > 0)) {
     try {
       const answer = await llmSynthesizeWithReasoning(
-        classified.query, toolResults, history, plan.mode, analysis
+        classified.query, toolResults, history, plan.mode, analysis, classified.category
       );
       return { answer, sources: [...new Set(sources)] };
     } catch (err) {
@@ -77,11 +78,9 @@ async function llmSynthesizeWithReasoning(
   toolResults: Array<{ tool: string; description: string; data: unknown }>,
   history: Array<{ role: string; content: string }>,
   mode: "analyst" | "executor",
-  analysis: DevOpsAnalysis
+  analysis: DevOpsAnalysis,
+  intentCategory: string
 ): Promise<string> {
-  const OpenAI = (await import("openai")).default;
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
   const systemPrompt = `You are a senior DevOps engineer working as Unwire AI's infrastructure assistant.
 You think and communicate like an experienced engineer who has seen thousands of production incidents.
 
@@ -96,9 +95,6 @@ CRITICAL RULES:
 - Structure: Summary → Evidence → Cause → Recommendation
 - If data is missing, explain what it means and what the user should do
 
-BAD response: "CPU: 80%. RAM: 60%. Health: 40/100. 1 server found."
-GOOD response: "Your API server is under significant CPU pressure at 80%, which explains the slow response times. This level of sustained load typically indicates either a traffic spike or an inefficient query. I'd recommend checking your database query times first."
-
 Mode: ${mode === "analyst" ? "ANALYST — explain and recommend, do not take action" : "EXECUTOR — action was taken, report what happened"}`;
 
   // Build structured context from the DevOps analysis
@@ -110,7 +106,6 @@ Mode: ${mode === "analyst" ? "ANALYST — explain and recommend, do not take act
   if (analysis.recommendations.length > 0) reasoningContext += `Recommendations: ${analysis.recommendations.join("; ")}\n`;
   if (analysis.missingData.length > 0) reasoningContext += `Missing Data: ${analysis.missingData.join("; ")}\n`;
 
-  // Also include raw tool data for the LLM to reference specific numbers
   const toolContext = toolResults.map((r) => {
     const dataStr = typeof r.data === "string" ? r.data : JSON.stringify(r.data, null, 2);
     return `--- Tool: ${r.tool} ---\n${dataStr.slice(0, 1500)}`;
@@ -120,7 +115,6 @@ Mode: ${mode === "analyst" ? "ANALYST — explain and recommend, do not take act
     { role: "system", content: systemPrompt },
   ];
 
-  // Add recent conversation history (last 4 messages)
   for (const msg of history.slice(-4)) {
     if (msg.role === "user" || msg.role === "assistant") {
       messages.push({ role: msg.role as "user" | "assistant", content: msg.content });
@@ -132,14 +126,15 @@ Mode: ${mode === "analyst" ? "ANALYST — explain and recommend, do not take act
     content: `${reasoningContext}\n\n${toolContext}\n\n---\n\nUser question: ${query}\n\nRespond as a senior DevOps engineer. Be specific, reference the data, and explain root causes.`,
   });
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  // Route to the appropriate model based on intent
+  const result = await routeAndGenerate({
+    intentCategory,
     messages,
-    max_tokens: 1024,
+    maxTokens: 1024,
     temperature: 0.3,
   });
 
-  return completion.choices[0]?.message?.content?.trim() ?? formatAnalysisAsResponse(analysis);
+  return result.content || formatAnalysisAsResponse(analysis);
 }
 
 // ─── Verification of action results ───────────────────────────────────────

@@ -6,7 +6,8 @@ import {
   fetchServerHealth, fetchServerLogs, fetchServerApps,
   fetchServerMetrics, fetchServerDomains, fetchServerSslCerts,
   triggerAppAction, addServerDomain, addServerSslCert,
-  deleteServerDomain, askServerQuestion,
+  deleteServerDomain, askServerQuestion, fetchAlerts,
+  type AlertItem,
 } from "@/services/api";
 import type {
   Server, ServerApp, ServerLog, ServerDomain, SslCert,
@@ -133,10 +134,30 @@ function MetricOverviewCard({ label, value, sub, icon: Icon }: {
 
 // ─── Active Alerts ────────────────────────────────────────────────────────
 
-function ActiveAlerts({ metric, apps }: { metric: ServerMetricSnapshot | null; apps: ServerApp[] }) {
+function ActiveAlerts({ metric, apps, serverId }: { metric: ServerMetricSnapshot | null; apps: ServerApp[]; serverId: string }) {
+  const [backendAlerts, setBackendAlerts] = useState<AlertItem[]>([]);
+
+  useEffect(() => {
+    fetchAlerts({ serverId, status: "ACTIVE", limit: 5 })
+      .then((res) => setBackendAlerts(res.alerts))
+      .catch(() => {});
+  }, [serverId]);
+
+  // Combine backend alerts with derived alerts
   const alerts: Array<{ level: "warn" | "error"; title: string; desc: string; time: string }> = [];
 
-  if (metric) {
+  // Backend alerts first
+  backendAlerts.forEach((a) => {
+    alerts.push({
+      level: a.severity === "CRITICAL" ? "error" : "warn",
+      title: a.title,
+      desc: a.message,
+      time: new Date(a.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    });
+  });
+
+  // Derived alerts from metrics (only if no backend alerts for same issue)
+  if (metric && backendAlerts.length === 0) {
     if (metric.ramPercent > 60) alerts.push({ level: "warn", title: "High Memory Usage", desc: `RAM usage is above ${Math.round(metric.ramPercent)}%`, time: "5m ago" });
     if (metric.diskPercent > 80) alerts.push({ level: "error", title: "Disk Usage Warning", desc: `Disk usage above ${Math.round(metric.diskPercent)}%`, time: "10m ago" });
     if (metric.cpuPercent > 80) alerts.push({ level: "error", title: "High CPU Usage", desc: `CPU at ${Math.round(metric.cpuPercent)}%`, time: "2m ago" });
@@ -265,7 +286,7 @@ function ApplicationsTable({ apps, serverId, onRefresh }: { apps: ServerApp[]; s
         <span className="text-xs text-muted-foreground">{apps.filter(a => a.status === "running").length}/{apps.length} running</span>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[700px]">
+        <table className="w-full text-sm min-w-[900px]">
           <thead className="bg-secondary/30 text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
               <th className="text-left px-4 py-3">Application</th>
@@ -273,6 +294,8 @@ function ApplicationsTable({ apps, serverId, onRefresh }: { apps: ServerApp[]; s
               <th className="text-left px-4 py-3">Status</th>
               <th className="text-left px-4 py-3">CPU</th>
               <th className="text-left px-4 py-3">RAM</th>
+              <th className="text-left px-4 py-3">Disk</th>
+              <th className="text-left px-4 py-3">Network</th>
               <th className="text-left px-4 py-3">Uptime</th>
               <th className="text-right px-4 py-3">Actions</th>
             </tr>
@@ -306,6 +329,8 @@ function ApplicationsTable({ apps, serverId, onRefresh }: { apps: ServerApp[]; s
                   </td>
                   <td className="px-4 py-3 font-mono text-xs">{app.cpu.toFixed(0)}%</td>
                   <td className="px-4 py-3 font-mono text-xs">{app.memory > 1024 ? `${(app.memory/1024).toFixed(1)}GB` : `${app.memory.toFixed(0)}MB`}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">—</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">—</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{app.uptime || "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -337,28 +362,125 @@ function ApplicationsTable({ apps, serverId, onRefresh }: { apps: ServerApp[]; s
 
 // ─── AI Insight Card ──────────────────────────────────────────────────────
 
-function AIInsightCard({ apps, metric }: { apps: ServerApp[]; metric: ServerMetricSnapshot | null }) {
-  const topApp = apps.sort((a, b) => b.memory - a.memory)[0];
+function AIInsightCard({ apps, metric, serverId }: { apps: ServerApp[]; metric: ServerMetricSnapshot | null; serverId: string }) {
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const topApp = [...apps].sort((a, b) => b.memory - a.memory)[0];
   if (!topApp || !metric) return null;
 
   const ramPct = metric.memoryTotal ? Math.round((topApp.memory / metric.memoryTotal) * 100) : null;
+
+  async function handleOptimize() {
+    setAiLoading(true);
+    try {
+      const result = await askServerQuestion(serverId, `Analyze ${topApp.name} which is using ${topApp.memory > 1024 ? `${(topApp.memory/1024).toFixed(1)}GB` : `${topApp.memory.toFixed(0)}MB`} RAM. Suggest optimization strategies.`);
+      setAiResponse(result.answer);
+    } catch {
+      toast.error("Failed to get AI analysis.");
+    }
+    setAiLoading(false);
+  }
+
+  async function handleAnalyze() {
+    setAiLoading(true);
+    try {
+      const result = await askServerQuestion(serverId, `Give me a comprehensive analysis of this server's health and performance. Focus on resource usage patterns and potential issues.`);
+      setAiResponse(result.answer);
+    } catch {
+      toast.error("Failed to get AI analysis.");
+    }
+    setAiLoading(false);
+  }
 
   return (
     <div className="glass rounded-2xl p-5 border border-primary/20">
       <div className="text-xs font-semibold text-primary uppercase tracking-wide mb-3 flex items-center gap-1.5">
         <Zap className="h-3.5 w-3.5" />AI Assistant Insight
       </div>
-      <p className="text-sm text-muted-foreground leading-relaxed">
-        <strong className="text-foreground">{topApp.name}</strong> is using{" "}
-        <strong className="text-foreground">{topApp.memory > 1024 ? `${(topApp.memory/1024).toFixed(1)}GB` : `${topApp.memory.toFixed(0)}MB`}</strong> RAM
-        {ramPct ? ` (${ramPct}% of total)` : ""}.
-        {topApp.memory > 500 && " Consider setting memory limits to prevent potential crashes."}
-      </p>
-      <button className="mt-3 btn-primary-grad px-3 py-1.5 rounded-md text-xs font-medium">
-        Optimize {topApp.name}
-      </button>
+      {aiResponse ? (
+        <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">
+          {aiResponse}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          <strong className="text-foreground">{topApp.name}</strong> is using{" "}
+          <strong className="text-foreground">{topApp.memory > 1024 ? `${(topApp.memory/1024).toFixed(1)}GB` : `${topApp.memory.toFixed(0)}MB`}</strong> RAM
+          {ramPct ? ` (${ramPct}% of total)` : ""}.
+          {topApp.memory > 500 && " Consider setting memory limits to prevent potential crashes."}
+        </p>
+      )}
+      <div className="flex items-center gap-2 mt-3">
+        <button onClick={handleAnalyze} disabled={aiLoading}
+          className="btn-primary-grad px-3 py-1.5 rounded-md text-xs font-medium disabled:opacity-50 flex items-center gap-1">
+          {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+          Analyze Issue
+        </button>
+        <button onClick={handleOptimize} disabled={aiLoading}
+          className="glass px-3 py-1.5 rounded-md text-xs font-medium border border-primary/30 hover:bg-primary/10 disabled:opacity-50 flex items-center gap-1">
+          Optimize
+        </button>
+      </div>
       <div className="mt-3 text-xs text-primary/70 flex items-center gap-1 cursor-pointer hover:text-primary">
         View all insights →
+      </div>
+    </div>
+  );
+}
+
+// ─── Agent Info Panel ─────────────────────────────────────────────────────
+
+function AgentInfoPanel({ server }: { server: Server }) {
+  const [regenerating, setRegenerating] = useState(false);
+
+  async function handleRegenerateToken() {
+    if (!confirm("Regenerate token? The current agent will disconnect.")) return;
+    setRegenerating(true);
+    try {
+      await fetch(`${(import.meta as any).env?.VITE_API_URL ?? "http://localhost:5000"}/api/servers/${server.id}/regenerate-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("unwire_access_token")}`,
+        },
+      });
+      toast.success("Token regenerated. Reconnect agent with new token.");
+    } catch {
+      toast.error("Failed to regenerate token.");
+    }
+    setRegenerating(false);
+  }
+
+  const agentStatus = server.status === "online" ? "Connected" : server.status === "unknown" ? "Awaiting Connection" : "Disconnected";
+  const statusColor = server.status === "online" ? "text-green-400" : server.status === "unknown" ? "text-yellow-400" : "text-red-400";
+
+  return (
+    <div className="glass rounded-2xl p-5">
+      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Agent Status</div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Status</span>
+          <span className={`text-xs font-medium ${statusColor}`}>{agentStatus}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Provider</span>
+          <span className="text-xs font-medium capitalize">{server.provider}</span>
+        </div>
+        {server.region && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Region</span>
+            <span className="text-xs font-medium">{server.region}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Applications</span>
+          <span className="text-xs font-medium">{server.appCount}</span>
+        </div>
+        <div className="pt-2 border-t border-border/40 space-y-2">
+          <button onClick={handleRegenerateToken} disabled={regenerating}
+            className="w-full text-[11px] px-3 py-1.5 rounded-lg glass border border-border/50 hover:border-yellow-500/50 text-muted-foreground hover:text-yellow-400 transition disabled:opacity-50">
+            {regenerating ? "Regenerating..." : "🔑 Regenerate Token"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -435,9 +557,13 @@ function ServerDashboard() {
           {/* ── Header ──────────────────────────────────────────────────── */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <Link to="/servers" className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:text-foreground mb-2">
-                <ChevronLeft className="h-3 w-3" /> Servers
-              </Link>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+                <Link to="/infrastructure" className="hover:text-foreground transition">Infrastructure</Link>
+                <span>/</span>
+                <Link to="/servers" className="hover:text-foreground transition">Servers</Link>
+                <span>/</span>
+                <span className="text-foreground">{server.name}</span>
+              </div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold">{server.name}</h1>
                 <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${STATUS_BADGE[server.status] ?? STATUS_BADGE.unknown}`}>
@@ -445,15 +571,23 @@ function ServerDashboard() {
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5 font-mono"><Globe className="h-3 w-3" />{server.host}</span>
+                <span className="flex items-center gap-1.5 font-mono"><Globe className="h-3 w-3" />IP: {server.host}</span>
                 {server.provider !== "custom" && <span className="uppercase">{server.provider}</span>}
                 {server.region && <span>{server.region}</span>}
+                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Uptime: {metric?.loadAverage ? "Active" : "—"}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1.5 text-xs text-green-400">
-                <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />Live
-              </span>
+              {server.status === "online" ? (
+                <span className="flex items-center gap-1.5 text-xs text-green-400">
+                  <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />Live
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full bg-gray-400" />
+                  {server.status === "unknown" ? "Awaiting Agent" : "Offline"}
+                </span>
+              )}
               <button onClick={loadAll} className="h-9 w-9 rounded-lg border border-border flex items-center justify-center hover:bg-secondary/40 transition">
                 <RefreshCw className="h-4 w-4 text-muted-foreground" />
               </button>
@@ -490,8 +624,9 @@ function ServerDashboard() {
             {/* Right sidebar */}
             <div className="space-y-4">
               <HealthScoreRing score={healthScore} />
-              <ActiveAlerts metric={metric} apps={apps} />
-              <AIInsightCard apps={apps} metric={metric} />
+              <ActiveAlerts metric={metric} apps={apps} serverId={server.id} />
+              <AIInsightCard apps={apps} metric={metric} serverId={server.id} />
+              <AgentInfoPanel server={server} />
             </div>
           </div>
         </main>

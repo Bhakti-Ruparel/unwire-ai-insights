@@ -20,10 +20,10 @@
  *       - Returns { answer, sources, sessionId }
  */
 
-import OpenAI from "openai";
 import { prisma } from "../database/db";
 import { isEmbeddingAvailable } from "./embeddings";
 import { askProject } from "./ragService";
+import { routeAndGenerate } from "./providers/modelRouter";
 
 // ─── System prompt ─────────────────────────────────────────────────────────
 
@@ -43,29 +43,17 @@ Rules:
 
 // ─── LLM caller ────────────────────────────────────────────────────────────
 
-let _openai: OpenAI | null = null;
-
-function getOpenAI(): OpenAI {
-  if (_openai) return _openai;
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set.");
-  _openai = new OpenAI({ apiKey });
-  return _openai;
-}
-
 /**
  * callLLM
  *
- * Sends the question + retrieved code context to GPT-4o-mini.
- * Context is the raw code chunks retrieved from ChromaDB.
+ * Sends the question + retrieved code context to the model router.
+ * Routes to Qwen Coder for code-related queries.
  */
 export async function callLLM(
   projectId: string,
   question: string,
   codeContext: string
 ): Promise<string> {
-  const openai = getOpenAI();
-
   const userMessage = `Project context (source code excerpts):
 
 ${codeContext}
@@ -74,17 +62,17 @@ ${codeContext}
 
 Question: ${question}`;
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const result = await routeAndGenerate({
+    intentCategory: "codebase", // Project chat is always code-related
     messages: [
-      { role: "system",  content: SYSTEM_PROMPT },
-      { role: "user",    content: userMessage   },
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: userMessage },
     ],
-    max_tokens:   1024,
-    temperature:  0.2,       // low temperature for factual code answers
+    maxTokens: 1024,
+    temperature: 0.2,
   });
 
-  return completion.choices[0]?.message?.content?.trim() ?? "I could not generate an answer.";
+  return result.content || "I could not generate an answer.";
 }
 
 // ─── Structured context fallback ───────────────────────────────────────────

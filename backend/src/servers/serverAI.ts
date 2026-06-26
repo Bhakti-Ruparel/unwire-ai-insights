@@ -54,18 +54,18 @@ export async function askServerAI(
     return { answer: "Server not found.", usedAI: false, context: { logsAnalyzed: 0, metricsAnalyzed: 0 } };
   }
 
-  // ── Try OpenAI if available ──────────────────────────────────────────────
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (apiKey) {
+  // ── Try AI if available ───────────────────────────────────────────────────
+  const hasAI = !!process.env.OPENROUTER_API_KEY || !!process.env.OPENAI_API_KEY || !!process.env.HUGGINGFACE_API_KEY;
+  if (hasAI) {
     try {
-      const answer = await callOpenAI(question, server.name, recentLogs, recentMetrics, apps, health);
+      const answer = await callAIModel(question, server.name, recentLogs, recentMetrics, apps, health);
       return {
         answer,
         usedAI: true,
         context: { logsAnalyzed: recentLogs.length, metricsAnalyzed: recentMetrics.length },
       };
     } catch (err) {
-      console.warn("[serverAI] OpenAI call failed, using structured fallback:", err);
+      console.warn("[serverAI] AI call failed, using structured fallback:", err);
     }
   }
 
@@ -78,9 +78,9 @@ export async function askServerAI(
   };
 }
 
-// ─── OpenAI call ──────────────────────────────────────────────────────────
+// ─── AI Model call (via model router) ─────────────────────────────────────
 
-async function callOpenAI(
+async function callAIModel(
   question: string,
   serverName: string,
   logs: any[],
@@ -88,8 +88,7 @@ async function callOpenAI(
   apps: any[],
   health: any
 ): Promise<string> {
-  const OpenAI = (await import("openai")).default;
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const { routeAndGenerate } = await import("../ai/providers/modelRouter");
 
   const logLines = logs
     .slice(0, 30)
@@ -128,17 +127,17 @@ ${logLines || "No logs available."}
 
 Question: ${question}`;
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const result = await routeAndGenerate({
+    intentCategory: "server_health",
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user",   content: userMessage },
+      { role: "user", content: userMessage },
     ],
-    max_tokens: 512,
+    maxTokens: 512,
     temperature: 0.2,
   });
 
-  return completion.choices[0]?.message?.content?.trim() ?? "Unable to generate answer.";
+  return result.content || "Unable to generate answer.";
 }
 
 // ─── Structured fallback ──────────────────────────────────────────────────
