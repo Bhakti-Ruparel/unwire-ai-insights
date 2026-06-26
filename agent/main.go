@@ -17,6 +17,7 @@ import (
 
 	"github.com/unwireai/agent/internal/config"
 	"github.com/unwireai/agent/internal/collector"
+	"github.com/unwireai/agent/internal/executor"
 	"github.com/unwireai/agent/internal/sender"
 )
 
@@ -103,6 +104,9 @@ func runAgent(cfg *config.Config) {
 	} else {
 		fmt.Printf("  ✓ Server ID: %s\n", cfg.ServerID)
 	}
+
+	// Start command server for deployment execution
+	executor.StartCommandServer(9898, cfg.Token)
 
 	// Create collector
 	c := collector.New(cfg.IntervalSeconds)

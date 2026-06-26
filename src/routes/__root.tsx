@@ -75,14 +75,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Unwire AI — AI DevOps Platform" },
+      { name: "description", content: "AI-powered DevOps platform: monitor infrastructure, deploy applications, analyze code, resolve incidents." },
+      { name: "author", content: "Unwire AI" },
+      { property: "og:title", content: "Unwire AI — AI DevOps Platform" },
+      { property: "og:description", content: "Mission control for software infrastructure powered by AI." },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:site", content: "@UnwireAI" },
     ],
     links: [
       {

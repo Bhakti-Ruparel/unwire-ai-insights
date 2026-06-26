@@ -40,6 +40,11 @@ export function setupGracefulShutdown(): void {
         await stopDeploymentWorker();
       } catch { /* ignore */ }
 
+      try {
+        const { closeIngestionQueue } = await import("../queue/ingestionQueue");
+        await closeIngestionQueue();
+      } catch { /* ignore */ }
+
       // 4. Close Redis cache
       await closeCache();
 

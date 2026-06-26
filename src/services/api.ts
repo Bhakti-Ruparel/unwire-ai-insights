@@ -847,3 +847,95 @@ export async function disconnectInfraProvider(connectionId: string): Promise<voi
 export async function syncInfraConnection(connectionId: string): Promise<any> {
   return apiFetch(`/api/infrastructure/sync/${connectionId}`, { method: "POST" });
 }
+
+// ─── Razorpay Billing ─────────────────────────────────────────────────────
+
+export interface CheckoutResponse {
+  subscriptionId: string;
+  orderId: string;
+  razorpayKeyId: string;
+  amount: number;
+  currency: string;
+  planName: string;
+}
+
+export async function createBillingCheckout(plan: string): Promise<CheckoutResponse> {
+  return apiFetch<CheckoutResponse>("/api/org/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+export async function verifyBillingPayment(data: {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+}): Promise<{ plan: string; message: string }> {
+  return apiFetch("/api/org/billing/verify", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function cancelBillingSubscription(): Promise<void> {
+  await apiFetch<unknown>("/api/org/billing/cancel", { method: "POST" });
+}
+
+// ─── Password Reset ───────────────────────────────────────────────────────
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiFetch<unknown>("/api/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifyResetToken(token: string): Promise<{ valid: boolean; email?: string }> {
+  return apiFetch(`/api/auth/verify-reset-token/${token}`);
+}
+
+export async function resetPassword(token: string, password: string): Promise<void> {
+  await apiFetch<unknown>("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}
+
+// ─── Profile Management ───────────────────────────────────────────────────
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatarUrl: string | null;
+  company: string;
+  bio: string;
+  createdAt: string;
+  projectCount: number;
+  serverCount: number;
+  organizations: Array<{ id: string; name: string; slug: string; plan: string; role: string }>;
+}
+
+export async function fetchProfile(): Promise<UserProfile | null> {
+  try { return await apiFetch<UserProfile>("/api/auth/profile"); }
+  catch { return null; }
+}
+
+export async function updateProfile(data: {
+  name?: string; avatarUrl?: string; company?: string; bio?: string;
+}): Promise<any> {
+  return apiFetch("/api/auth/profile", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchSessions(): Promise<Array<{ id: string; userAgent: string; ipAddress: string; createdAt: string }>> {
+  try { return await apiFetch("/api/auth/sessions"); }
+  catch { return []; }
+}
+
+export async function logoutAllSessions(): Promise<void> {
+  await apiFetch<unknown>("/api/auth/logout-all", { method: "POST" });
+}

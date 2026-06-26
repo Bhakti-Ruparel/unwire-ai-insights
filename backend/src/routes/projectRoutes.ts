@@ -6,6 +6,7 @@ import * as controller from "../controllers/projectController";
 import { authenticate } from "../middleware/authenticate";
 import { requireProjectOwnership } from "../middleware/requireOwnership";
 import { uploadLimiter } from "../middleware/rateLimiter";
+import { enforceProjectLimit } from "../middleware/subscriptionGuard";
 import { getDeploymentPlan } from "../controllers/deploymentController";
 
 const router = Router();
@@ -40,7 +41,7 @@ const upload = multer({
 
 // List & create — require authentication
 router.get("/",    authenticate, controller.listProjects);
-router.post("/",   authenticate, controller.createProject);
+router.post("/",   authenticate, enforceProjectLimit, controller.createProject);
 
 // All single-project routes require authentication + ownership check
 router.get("/:id",        authenticate, requireProjectOwnership, controller.getProject);

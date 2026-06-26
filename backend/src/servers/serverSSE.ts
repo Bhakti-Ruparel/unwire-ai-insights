@@ -17,6 +17,15 @@ interface SSEClient {
 // ─── Active SSE connections ───────────────────────────────────────────────
 const activeClients = new Map<string, SSEClient>();
 
+// Periodic cleanup of stale connections (every 60s)
+setInterval(() => {
+  for (const [id, client] of activeClients) {
+    if (client.response.writableEnded || client.response.destroyed) {
+      activeClients.delete(id);
+    }
+  }
+}, 60_000);
+
 /**
  * Stream server updates via SSE.
  * Client connects and receives real-time updates.

@@ -16,8 +16,10 @@ import type { ConnectionOptions } from "bullmq";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 
-// Cache the availability check — only probe once per process lifetime
+// Cache the availability check — re-probe every 60 seconds to allow recovery
 let _cachedAvailable: boolean | null = null;
+let _lastCheckTime = 0;
+const RECHECK_INTERVAL_MS = 60_000;
 
 /** Parse REDIS_URL into a BullMQ ConnectionOptions object */
 export function getRedisConnectionOptions(): ConnectionOptions {
@@ -53,7 +55,10 @@ export function getRedisConnectionOptions(): ConnectionOptions {
  * Result is cached so subsequent calls return immediately.
  */
 export async function isRedisAvailable(): Promise<boolean> {
-  if (_cachedAvailable !== null) return _cachedAvailable;
+  const now = Date.now();
+  if (_cachedAvailable !== null && (now - _lastCheckTime) < RECHECK_INTERVAL_MS) {
+    return _cachedAvailable;
+  }
 
   return new Promise<boolean>((resolve) => {
     // BullMQ bundles ioredis — use it directly to avoid version conflicts
@@ -78,24 +83,28 @@ export async function isRedisAvailable(): Promise<boolean> {
         .then(() => {
           client.quit().catch(() => {});
           _cachedAvailable = true;
+          _lastCheckTime = Date.now();
           resolve(true);
         })
         .catch(() => {
           client.disconnect(false);
           _cachedAvailable = false;
+          _lastCheckTime = Date.now();
           resolve(false);
         });
 
       // Hard timeout safety net
       setTimeout(() => {
-        if (_cachedAvailable === null) {
+        if (_cachedAvailable === null || (Date.now() - _lastCheckTime) >= RECHECK_INTERVAL_MS) {
           client.disconnect(false);
           _cachedAvailable = false;
+          _lastCheckTime = Date.now();
           resolve(false);
         }
       }, 1500);
     } catch {
       _cachedAvailable = false;
+      _lastCheckTime = Date.now();
       resolve(false);
     }
   });

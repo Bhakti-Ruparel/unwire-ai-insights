@@ -14,10 +14,15 @@ type MonitoringJob =
   | { type: "apps"; serverId: string; payload: svc.AppIngestPayload[] }
   | { type: "logs"; serverId: string; payload: svc.LogIngestPayload[] };
 
+const MAX_QUEUE_SIZE = 10000; // Backpressure: drop oldest jobs if queue grows too large
 const pending: MonitoringJob[] = [];
 let draining = false;
 
 export function enqueueMonitoringJob(job: MonitoringJob): void {
+  // Backpressure: if queue is too large, drop oldest entries (prevents OOM)
+  if (pending.length >= MAX_QUEUE_SIZE) {
+    pending.shift(); // Drop oldest
+  }
   pending.push(job);
   if (!draining) {
     draining = true;

@@ -190,3 +190,36 @@ export async function streamDeploymentLogs(req: Request, res: Response): Promise
   // Clean up on client disconnect
   req.on("close", () => { finished = true; });
 }
+
+// ─── POST /api/deployments/webhook/github ─────────────────────────────────
+export async function handleGitHubWebhook(req: Request, res: Response): Promise<void> {
+  try {
+    const signature = req.headers["x-hub-signature-256"] as string ?? "";
+    const event = req.headers["x-github-event"] as string;
+    const body = JSON.stringify(req.body);
+
+    // Only handle push events
+    if (event !== "push") {
+      res.json({ success: true, data: { message: `Event '${event}' ignored.` } });
+      return;
+    }
+
+    // Verify webhook signature
+    const { verifyWebhookSignature, handlePushWebhook } = await import("../deployment/githubIntegration");
+    if (process.env.GITHUB_WEBHOOK_SECRET) {
+      if (!signature || !verifyWebhookSignature(body, signature)) {
+        res.status(401).json({ success: false, error: "Invalid webhook signature." });
+        return;
+      }
+    } else if (process.env.NODE_ENV === "production") {
+      res.status(500).json({ success: false, error: "Webhook secret not configured." });
+      return;
+    }
+
+    const result = await handlePushWebhook(req.body);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error("[webhook:github]", err);
+    res.status(500).json({ success: false, error: "Webhook processing failed." });
+  }
+}

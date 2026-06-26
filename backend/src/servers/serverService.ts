@@ -294,15 +294,11 @@ export async function recordHeartbeat(serverId: string, payload: HeartbeatPayloa
     data: { status: payload.status ?? "online" },
   });
 
-  const old = await prisma.serverHeartbeat.findMany({
-    where: { serverId },
-    orderBy: { timestamp: "desc" },
-    skip: 2880,
-    select: { id: true },
+  // Prune old heartbeats — keep last 48 hours
+  const heartbeatCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  await prisma.serverHeartbeat.deleteMany({
+    where: { serverId, timestamp: { lt: heartbeatCutoff } },
   });
-  if (old.length > 0) {
-    await prisma.serverHeartbeat.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
-  }
 }
 
 export async function regenerateAgentToken(id: string): Promise<AgentTokenDTO> {
@@ -346,16 +342,11 @@ export async function saveMetric(
       recordedAt: metric.timestamp ? new Date(metric.timestamp) : new Date(),
     },
   });
-  // Prune old metrics — keep last 288 records (~24h at 5min intervals)
-  const old = await prisma.serverMetric.findMany({
-    where: { serverId },
-    orderBy: { recordedAt: "desc" },
-    skip: 288,
-    select: { id: true },
+  // Prune old metrics — keep last 24 hours (timestamp-based, scales better than skip-based)
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  await prisma.serverMetric.deleteMany({
+    where: { serverId, recordedAt: { lt: cutoff } },
   });
-  if (old.length > 0) {
-    await prisma.serverMetric.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
-  }
 }
 
 export async function getMetricHistory(
@@ -565,15 +556,11 @@ export async function appendLogs(
       timestamp: normalizeTimestamp(l.timestamp),
     })),
   });
-  // Keep last 10,000 logs per server
-  const old = await prisma.serverLog.findMany({
-    where: { serverId },
-    orderBy: { timestamp: "desc" },
-    skip: 10000, select: { id: true },
+  // Prune old logs — keep last 7 days (timestamp-based, efficient at scale)
+  const logCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  await prisma.serverLog.deleteMany({
+    where: { serverId, timestamp: { lt: logCutoff } },
   });
-  if (old.length > 0) {
-    await prisma.serverLog.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
-  }
 }
 
 // ─── Domains ───────────────────────────────────────────────────────────────

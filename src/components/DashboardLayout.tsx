@@ -11,9 +11,9 @@ import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard, FolderOpen, Server, Rocket, Activity,
   MonitorCheck, MessagesSquare, Clock, Shield, Settings,
-  Users, Building2, Bell, LogOut, ChevronDown, Cloud,
+  Users, Building2, Bell, LogOut, ChevronDown, Cloud, User,
 } from "lucide-react";
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { GlobalAIAgent } from "@/components/GlobalAIAgent";
 
 // ─── Navigation config ────────────────────────────────────────────────────
@@ -112,19 +112,52 @@ function DashboardSidebar() {
         </div>
       </nav>
 
-      {/* User */}
-      <div className="px-3 py-3 border-t border-border/40">
-        <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-secondary/20 transition cursor-pointer">
-          <div className="h-8 w-8 rounded-full btn-primary-grad flex items-center justify-center text-[11px] font-bold shrink-0">
-            {initials}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-medium truncate">{user?.name ?? "User"}</div>
-            <div className="text-[10px] text-muted-foreground truncate">{user?.email}</div>
-          </div>
-        </div>
+      {/* User — with dropdown */}
+      <div className="px-3 py-3 border-t border-border/40 relative">
+        <ProfileDropdown user={user} initials={initials} onLogout={logout} />
       </div>
     </aside>
+  );
+}
+
+function ProfileDropdown({ user, initials, onLogout }: { user: any; initials: string; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-secondary/20 transition cursor-pointer text-left">
+        <div className="h-8 w-8 rounded-full btn-primary-grad flex items-center justify-center text-[11px] font-bold shrink-0">
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[13px] font-medium truncate">{user?.name ?? "User"}</div>
+          <div className="text-[10px] text-muted-foreground truncate">{user?.email}</div>
+        </div>
+        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-full left-0 right-0 mb-2 z-50 glass-strong rounded-xl border border-border shadow-2xl overflow-hidden">
+            <Link to="/profile" onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition">
+              <User className="h-3.5 w-3.5" /> View Profile
+            </Link>
+            <Link to="/settings" onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition">
+              <Settings className="h-3.5 w-3.5" /> Account Settings
+            </Link>
+            <div className="border-t border-border/40" />
+            <button onClick={() => { setOpen(false); onLogout(); }}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-red-400 hover:bg-red-500/10 transition">
+              <LogOut className="h-3.5 w-3.5" /> Log out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

@@ -1,60 +1,91 @@
 /**
  * emailService.ts
  *
- * Production-ready email service. Sends via SMTP when configured,
- * falls back to console logging in development.
+ * Production email service with provider abstraction.
+ * Supports: Resend, AWS SES (via nodemailer), SMTP.
+ * Configured via environment variables.
  *
- * Env vars:
- *   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
- *   FRONTEND_URL (used for building links)
+ * All email sending is non-blocking (fire-and-forget with logging).
  */
 
-import { createTransport, type Transporter } from "nodemailer";
+import nodemailer from "nodemailer";
+import { logger } from "./logger";
 
-// ─── Result type ──────────────────────────────────────────────────────────
+// ─── Configuration ────────────────────────────────────────────────────────
 
-export interface EmailResult {
-  sent: boolean;
-  method: "smtp" | "console";
-  error?: string;
-}
+const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER ?? "smtp"; // "resend" | "ses" | "smtp"
+const EMAIL_FROM = process.env.EMAIL_FROM ?? "Unwire AI <noreply@unwire.ai>";
+const SMTP_HOST = process.env.SMTP_HOST ?? "localhost";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT ?? "587");
+const SMTP_USER = process.env.SMTP_USER ?? "";
+const SMTP_PASS = process.env.SMTP_PASS ?? "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
+const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:3000";
 
-// ─── Transporter setup ────────────────────────────────────────────────────
+// ─── Transporter ──────────────────────────────────────────────────────────
 
-let _transporter: Transporter | null = null;
-let _transporterChecked = false;
+let _transporter: nodemailer.Transporter | null = null;
 
-function getTransporter(): Transporter | null {
-  if (_transporterChecked) return _transporter;
-  _transporterChecked = true;
+function getTransporter(): nodemailer.Transporter {
+  if (_transporter) return _transporter;
 
-  const host = process.env.SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT ?? "587", 10);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASSWORD;
-
-  if (!host || !user || !pass) {
-    console.log("[email] SMTP not configured — emails will be logged to console.");
-    return null;
+  if (EMAIL_PROVIDER === "ses") {
+    _transporter = nodemailer.createTransport({
+      host: "email-smtp.us-east-1.amazonaws.com",
+      port: 465,
+      secure: true,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+  } else {
+    _transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
+      tls: { rejectUnauthorized: false },
+    });
   }
 
-  _transporter = createTransport({
-    host, port,
-    secure: port === 465,
-    auth: { user, pass },
-  });
   return _transporter;
 }
 
-function getFrom(): string {
-  return process.env.SMTP_FROM ?? "Unwire AI <noreply@unwire.ai>";
+// ─── Send via Resend API ──────────────────────────────────────────────────
+
+async function sendViaResend(to: string, subject: string, html: string): Promise<boolean> {
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({ from: EMAIL_FROM, to, subject, html }),
+    });
+    return res.ok;
+  } catch (err) {
+    logger.error(`[email:resend] Failed: ${err}`);
+    return false;
+  }
 }
 
-function getFrontendUrl(): string {
-  return (process.env.FRONTEND_URL?.split(",")[0]?.trim() ?? "http://localhost:5173").replace(/\/$/, "");
+// ─── Core send function ───────────────────────────────────────────────────
+
+async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  try {
+    if (EMAIL_PROVIDER === "resend" && RESEND_API_KEY) {
+      return await sendViaResend(to, subject, html);
+    }
+
+    const transporter = getTransporter();
+    await transporter.sendMail({ from: EMAIL_FROM, to, subject, html });
+    return true;
+  } catch (err) {
+    logger.warn(`[email] Send failed to ${to}: ${err}`);
+    return false;
+  }
 }
 
-// ─── Send invitation email ────────────────────────────────────────────────
+// ─── Email Templates ──────────────────────────────────────────────────────
 
 export async function sendInvitationEmail(opts: {
   to: string;
@@ -62,173 +93,103 @@ export async function sendInvitationEmail(opts: {
   inviterName: string;
   role: string;
   token: string;
-}): Promise<EmailResult> {
-  const acceptUrl = `${getFrontendUrl()}/invite/${opts.token}`;
-  const subject = `You've been invited to join ${opts.orgName} on Unwire AI`;
-
-  const html = buildInvitationHtml({
-    orgName: opts.orgName,
-    inviterName: opts.inviterName,
-    role: opts.role,
-    acceptUrl,
-  });
-
-  const transporter = getTransporter();
-
-  if (!transporter) {
-    // Development fallback — log to console
-    console.log("");
-    console.log("┌─────────────────────────────────────────────────────────────");
-    console.log("│ 📧 INVITATION EMAIL (dev mode — SMTP not configured)");
-    console.log("│");
-    console.log(`│ To:           ${opts.to}`);
-    console.log(`│ Organization: ${opts.orgName}`);
-    console.log(`│ Invited by:   ${opts.inviterName}`);
-    console.log(`│ Role:         ${opts.role}`);
-    console.log("│");
-    console.log(`│ 🔗 Accept URL: ${acceptUrl}`);
-    console.log("│");
-    console.log("└─────────────────────────────────────────────────────────────");
-    console.log("");
-    return { sent: true, method: "console" };
-  }
-
-  try {
-    await transporter.sendMail({
-      from: getFrom(),
-      to: opts.to,
-      subject,
-      html,
-    });
-    return { sent: true, method: "smtp" };
-  } catch (err: any) {
-    console.error("[email] SMTP send failed:", err.message);
-    return { sent: false, method: "smtp", error: err.message };
-  }
-}
-
-// ─── HTML Template ────────────────────────────────────────────────────────
-
-function buildInvitationHtml(opts: {
-  orgName: string;
-  inviterName: string;
-  role: string;
-  acceptUrl: string;
-}): string {
-  return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background-color:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <div style="max-width:520px;margin:0 auto;padding:40px 24px;">
-    <!-- Logo -->
-    <div style="text-align:center;margin-bottom:32px;">
-      <span style="font-size:20px;font-weight:700;color:#f8fafc;letter-spacing:-0.5px;">⚡ Unwire AI</span>
-    </div>
-
-    <!-- Card -->
-    <div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:32px;">
-      <h1 style="color:#f8fafc;font-size:22px;font-weight:600;margin:0 0 8px 0;">
-        You're invited!
-      </h1>
-      <p style="color:#94a3b8;font-size:15px;line-height:1.6;margin:0 0 24px 0;">
-        <strong style="color:#e2e8f0;">${opts.inviterName}</strong> has invited you to join
-        <strong style="color:#e2e8f0;">${opts.orgName}</strong> on Unwire AI.
+}): Promise<{ sent: boolean; method: string; error?: string }> {
+  const { to, orgName, inviterName, token } = opts;
+  const link = `${FRONTEND_URL}/invite/${token}`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: #1a1a2e;">You're invited to ${orgName}</h2>
+      <p style="color: #555; line-height: 1.6;">
+        <strong>${inviterName}</strong> has invited you to join <strong>${orgName}</strong> on Unwire AI.
       </p>
-
-      <!-- Details -->
-      <div style="background:#0f172a;border-radius:10px;padding:16px;margin-bottom:24px;">
-        <table style="width:100%;border-collapse:collapse;">
-          <tr>
-            <td style="padding:6px 0;color:#64748b;font-size:13px;width:110px;">Organization</td>
-            <td style="padding:6px 0;color:#e2e8f0;font-size:13px;font-weight:500;">${opts.orgName}</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;color:#64748b;font-size:13px;">Your Role</td>
-            <td style="padding:6px 0;color:#e2e8f0;font-size:13px;font-weight:500;">${opts.role}</td>
-          </tr>
-          <tr>
-            <td style="padding:6px 0;color:#64748b;font-size:13px;">Invited by</td>
-            <td style="padding:6px 0;color:#e2e8f0;font-size:13px;font-weight:500;">${opts.inviterName}</td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- CTA Button -->
-      <div style="text-align:center;margin-bottom:20px;">
-        <a href="${opts.acceptUrl}"
-           style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#ffffff;text-decoration:none;border-radius:10px;font-weight:600;font-size:15px;">
-          Accept Invitation
-        </a>
-      </div>
-
-      <!-- Fallback link -->
-      <p style="color:#64748b;font-size:12px;text-align:center;margin:0;word-break:break-all;">
-        Or copy this link:<br>
-        <a href="${opts.acceptUrl}" style="color:#818cf8;">${opts.acceptUrl}</a>
+      <a href="${link}" style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin: 16px 0;">
+        Accept Invitation
+      </a>
+      <p style="color: #888; font-size: 13px;">
+        This invitation expires in 7 days. If you didn't expect this, ignore this email.
       </p>
-    </div>
-
-    <!-- Footer -->
-    <p style="color:#475569;font-size:11px;text-align:center;margin-top:24px;line-height:1.5;">
-      This invitation expires in 7 days.<br>
-      If you didn't expect this email, you can safely ignore it.
-    </p>
-  </div>
-</body>
-</html>`;
+    </div>`;
+  const sent = await sendEmail(to, `Join ${orgName} on Unwire AI`, html);
+  return { sent, method: EMAIL_PROVIDER, error: sent ? undefined : "Delivery failed" };
 }
 
-// ─── Send alert email ─────────────────────────────────────────────────────
-
-export async function sendAlertEmail(opts: {
-  to: string;
-  title: string;
-  message: string;
-  severity: string;
-}): Promise<EmailResult> {
-  const transporter = getTransporter();
-  if (!transporter) {
-    console.log(`📧 [EMAIL] Alert → ${opts.to}: [${opts.severity}] ${opts.title}`);
-    return { sent: true, method: "console" };
-  }
-
-  try {
-    await transporter.sendMail({
-      from: getFrom(), to: opts.to,
-      subject: `[${opts.severity}] ${opts.title} — Unwire AI`,
-      html: `<p><strong>${opts.title}</strong></p><p>${opts.message}</p>`,
-    });
-    return { sent: true, method: "smtp" };
-  } catch (err: any) {
-    return { sent: false, method: "smtp", error: err.message };
-  }
+export async function sendPasswordResetEmail(
+  email: string,
+  token: string
+): Promise<boolean> {
+  const link = `${FRONTEND_URL}/reset-password?token=${token}`;
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: #1a1a2e;">Reset your password</h2>
+      <p style="color: #555; line-height: 1.6;">
+        You requested a password reset. Click the button below to set a new password.
+      </p>
+      <a href="${link}" style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin: 16px 0;">
+        Reset Password
+      </a>
+      <p style="color: #888; font-size: 13px;">
+        This link expires in 1 hour. If you didn't request this, ignore this email.
+      </p>
+    </div>`;
+  return sendEmail(email, "Reset your Unwire AI password", html);
 }
 
-// ─── Send deployment email ────────────────────────────────────────────────
+export async function sendDeploymentSuccessEmail(
+  email: string,
+  projectName: string,
+  serverName: string,
+  version: number
+): Promise<boolean> {
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: #22c55e;">✓ Deployment Successful</h2>
+      <p style="color: #555; line-height: 1.6;">
+        <strong>${projectName}</strong> v${version} has been deployed to <strong>${serverName}</strong>.
+      </p>
+      <a href="${FRONTEND_URL}/deployments" style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin: 16px 0;">
+        View Deployment
+      </a>
+    </div>`;
+  return sendEmail(email, `✓ ${projectName} v${version} deployed`, html);
+}
 
-export async function sendDeploymentEmail(opts: {
-  to: string;
-  projectName: string;
-  version: number;
-  status: string;
-  serverName: string;
-}): Promise<EmailResult> {
-  const transporter = getTransporter();
-  if (!transporter) {
-    console.log(`📧 [EMAIL] Deployment → ${opts.to}: ${opts.projectName} v${opts.version} ${opts.status}`);
-    return { sent: true, method: "console" };
-  }
+export async function sendDeploymentFailureEmail(
+  email: string,
+  projectName: string,
+  serverName: string,
+  version: number,
+  error: string
+): Promise<boolean> {
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: #ef4444;">✗ Deployment Failed</h2>
+      <p style="color: #555; line-height: 1.6;">
+        <strong>${projectName}</strong> v${version} failed to deploy to <strong>${serverName}</strong>.
+      </p>
+      <p style="background: #fef2f2; padding: 12px; border-radius: 6px; color: #991b1b; font-size: 13px;">
+        ${error.slice(0, 200)}
+      </p>
+      <a href="${FRONTEND_URL}/deployments" style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin: 16px 0;">
+        View Logs
+      </a>
+    </div>`;
+  return sendEmail(email, `✗ ${projectName} v${version} deployment failed`, html);
+}
 
-  const icon = opts.status === "SUCCESS" ? "✅" : "❌";
-  try {
-    await transporter.sendMail({
-      from: getFrom(), to: opts.to,
-      subject: `${icon} Deployment ${opts.status}: ${opts.projectName} v${opts.version}`,
-      html: `<p>${icon} <strong>${opts.projectName}</strong> v${opts.version} deployed to ${opts.serverName}: <strong>${opts.status}</strong></p>`,
-    });
-    return { sent: true, method: "smtp" };
-  } catch (err: any) {
-    return { sent: false, method: "smtp", error: err.message };
-  }
+export async function sendAlertEmail(
+  email: string,
+  title: string,
+  message: string,
+  severity: string
+): Promise<boolean> {
+  const color = severity === "CRITICAL" ? "#ef4444" : "#f59e0b";
+  const html = `
+    <div style="font-family: -apple-system, sans-serif; max-width: 500px; margin: 0 auto; padding: 32px;">
+      <h2 style="color: ${color};">⚠ ${title}</h2>
+      <p style="color: #555; line-height: 1.6;">${message}</p>
+      <a href="${FRONTEND_URL}/alerts" style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin: 16px 0;">
+        View Alerts
+      </a>
+    </div>`;
+  return sendEmail(email, `[${severity}] ${title}`, html);
 }

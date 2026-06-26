@@ -11,10 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as OverviewRouteImport } from './routes/overview'
 import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InfrastructureRouteImport } from './routes/infrastructure'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -47,6 +51,21 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OverviewRoute = OverviewRouteImport.update({
   id: '/overview',
   path: '/overview',
@@ -65,6 +84,11 @@ const LoginRoute = LoginRouteImport.update({
 const InfrastructureRoute = InfrastructureRouteImport.update({
   id: '/infrastructure',
   path: '/infrastructure',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AssistantRoute = AssistantRouteImport.update({
@@ -186,10 +210,14 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
   '/assistant': typeof AssistantRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
   '/monitoring': typeof MonitoringRoute
   '/overview': typeof OverviewRoute
+  '/pricing': typeof PricingRoute
+  '/profile': typeof ProfileRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
@@ -215,10 +243,14 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
   '/assistant': typeof AssistantRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
   '/monitoring': typeof MonitoringRoute
   '/overview': typeof OverviewRoute
+  '/pricing': typeof PricingRoute
+  '/profile': typeof ProfileRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
@@ -244,10 +276,14 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
   '/assistant': typeof AssistantRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/infrastructure': typeof InfrastructureRoute
   '/login': typeof LoginRoute
   '/monitoring': typeof MonitoringRoute
   '/overview': typeof OverviewRoute
+  '/pricing': typeof PricingRoute
+  '/profile': typeof ProfileRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/settings': typeof SettingsRoute
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
@@ -275,10 +311,14 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/assistant'
+    | '/forgot-password'
     | '/infrastructure'
     | '/login'
     | '/monitoring'
     | '/overview'
+    | '/pricing'
+    | '/profile'
+    | '/reset-password'
     | '/settings'
     | '/signup'
     | '/deployments/$deploymentId'
@@ -304,10 +344,14 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/assistant'
+    | '/forgot-password'
     | '/infrastructure'
     | '/login'
     | '/monitoring'
     | '/overview'
+    | '/pricing'
+    | '/profile'
+    | '/reset-password'
     | '/settings'
     | '/signup'
     | '/deployments/$deploymentId'
@@ -332,10 +376,14 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/assistant'
+    | '/forgot-password'
     | '/infrastructure'
     | '/login'
     | '/monitoring'
     | '/overview'
+    | '/pricing'
+    | '/profile'
+    | '/reset-password'
     | '/settings'
     | '/signup'
     | '/deployments/$deploymentId'
@@ -362,10 +410,14 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AlertsRoute: typeof AlertsRoute
   AssistantRoute: typeof AssistantRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   InfrastructureRoute: typeof InfrastructureRoute
   LoginRoute: typeof LoginRoute
   MonitoringRoute: typeof MonitoringRoute
   OverviewRoute: typeof OverviewRoute
+  PricingRoute: typeof PricingRoute
+  ProfileRoute: typeof ProfileRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SettingsRoute: typeof SettingsRoute
   SignupRoute: typeof SignupRoute
   DeploymentsDeploymentIdRoute: typeof DeploymentsDeploymentIdRoute
@@ -390,6 +442,27 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/overview': {
@@ -418,6 +491,13 @@ declare module '@tanstack/react-router' {
       path: '/infrastructure'
       fullPath: '/infrastructure'
       preLoaderRoute: typeof InfrastructureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/assistant': {
@@ -605,10 +685,14 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AlertsRoute: AlertsRoute,
   AssistantRoute: AssistantRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   InfrastructureRoute: InfrastructureRoute,
   LoginRoute: LoginRoute,
   MonitoringRoute: MonitoringRoute,
   OverviewRoute: OverviewRoute,
+  PricingRoute: PricingRoute,
+  ProfileRoute: ProfileRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SettingsRoute: SettingsRoute,
   SignupRoute: SignupRoute,
   DeploymentsDeploymentIdRoute: DeploymentsDeploymentIdRoute,

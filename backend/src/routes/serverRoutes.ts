@@ -4,12 +4,16 @@ import { authenticate } from "../middleware/authenticate";
 import { requireAgentOrOwnership, requireServerOwnerOrAdmin, requireServerOwnership } from "../middleware/requireOwnership";
 import { agentPushLimiter } from "../middleware/rateLimiter";
 import { subscribeToServerEvents } from "../servers/serverSSE";
+import { enforceServerLimit } from "../middleware/subscriptionGuard";
+import { withOrgContext } from "../middleware/organizationContext";
+import { validate } from "../middleware/validate";
+import { createServerSchema } from "../schemas";
 
 const router = Router();
 
-// ─── CRUD — require authentication ────────────────────────────────────────
-router.get("/",    authenticate, ctrl.listServers);
-router.post("/",   authenticate, ctrl.createServer);
+// ─── CRUD — require authentication + org context ──────────────────────────
+router.get("/",    authenticate, withOrgContext, ctrl.listServers);
+router.post("/",   authenticate, withOrgContext, enforceServerLimit, validate(createServerSchema), ctrl.createServer);
 
 // All single-server routes require auth + ownership
 router.get("/:id",    authenticate, requireServerOwnership, ctrl.getServer);

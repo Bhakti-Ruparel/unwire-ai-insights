@@ -14,8 +14,11 @@ import crypto from "crypto";
 import { prisma } from "../database/db";
 
 const SALT_ROUNDS    = 12;
-const ACCESS_SECRET  = process.env.JWT_SECRET ?? "unwire-ai-access-secret";
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? "unwire-ai-refresh-secret";
+const NODE_ENV       = process.env.NODE_ENV ?? "development";
+
+// Fail-fast in production if secrets are not configured
+const ACCESS_SECRET  = process.env.JWT_SECRET ?? (NODE_ENV === "production" ? (() => { throw new Error("JWT_SECRET must be set in production"); })() : "unwire-dev-access-secret-do-not-use");
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? (NODE_ENV === "production" ? (() => { throw new Error("JWT_REFRESH_SECRET must be set in production"); })() : "unwire-dev-refresh-secret-do-not-use");
 const ACCESS_TTL     = "15m";
 const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -192,6 +195,8 @@ export async function getUserProfile(userId: string) {
     role:         user.role,
     isActive:     user.isActive,
     avatarUrl:    user.avatarUrl,
+    company:      user.company,
+    bio:          user.bio,
     createdAt:    user.createdAt.toISOString(),
     projectCount: user._count.projects,
     serverCount:  user._count.servers,
@@ -203,6 +208,43 @@ export async function getUserProfile(userId: string) {
       role: m.role,
     })),
   };
+}
+
+// ─── Update Profile ───────────────────────────────────────────────────────
+
+export async function updateUserProfile(
+  userId: string,
+  data: { name?: string; avatarUrl?: string; company?: string; bio?: string }
+) {
+  const updateData: any = {};
+  if (data.name !== undefined) updateData.name = data.name.trim();
+  if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl || null;
+  if (data.company !== undefined) updateData.company = data.company.trim();
+  if (data.bio !== undefined) updateData.bio = data.bio.trim();
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: updateData,
+    select: { id: true, name: true, email: true, avatarUrl: true, company: true, bio: true },
+  });
+
+  return user;
+}
+
+// ─── Active Sessions ──────────────────────────────────────────────────────
+
+export async function getActiveSessions(userId: string) {
+  const sessions = await prisma.session.findMany({
+    where: { userId, expiresAt: { gt: new Date() } },
+    select: { id: true, userAgent: true, ipAddress: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return sessions.map((s) => ({
+    id: s.id,
+    userAgent: s.userAgent,
+    ipAddress: s.ipAddress,
+    createdAt: s.createdAt.toISOString(),
+  }));
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────

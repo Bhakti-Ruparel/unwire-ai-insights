@@ -333,3 +333,88 @@ async function requireOrgRole(userId: string, allowedRoles: string[]): Promise<{
   }
   return { allowed: true, orgId: m.organizationId };
 }
+
+// ─── POST /api/org/billing/checkout — Create Razorpay order ───────────────
+export async function createCheckout(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) { res.status(401).json({ success: false, error: "Auth required." }); return; }
+    const perm = await requireOrgRole(userId, ["OWNER", "ADMIN"]);
+    if (!perm.allowed) { res.status(403).json({ success: false, error: perm.error }); return; }
+
+    const { plan } = req.body as { plan?: string };
+    if (!plan || !["pro", "enterprise"].includes(plan)) {
+      res.status(400).json({ success: false, error: "Valid plan required (pro, enterprise)." }); return;
+    }
+
+    const { createSubscriptionOrder } = await import("../billing/razorpayService");
+    const result = await createSubscriptionOrder(perm.orgId!, userId, plan as any);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Checkout failed.";
+    res.status(400).json({ success: false, error: msg });
+  }
+}
+
+// ─── POST /api/org/billing/verify — Verify Razorpay payment ──────────────
+export async function verifyPayment(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) { res.status(401).json({ success: false, error: "Auth required." }); return; }
+    const perm = await requireOrgRole(userId, ["OWNER", "ADMIN"]);
+    if (!perm.allowed) { res.status(403).json({ success: false, error: perm.error }); return; }
+
+    const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = req.body;
+    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+      res.status(400).json({ success: false, error: "Payment verification fields required." }); return;
+    }
+
+    const { verifyPayment: verify } = await import("../billing/razorpayService");
+    const result = await verify(perm.orgId!, userId, {
+      razorpay_payment_id, razorpay_order_id, razorpay_signature,
+    });
+
+    if (!result.success) {
+      res.status(400).json({ success: false, error: result.error });
+      return;
+    }
+    res.json({ success: true, data: { plan: result.plan, message: "Payment verified. Plan upgraded!" } });
+  } catch {
+    res.status(500).json({ success: false, error: "Payment verification failed." });
+  }
+}
+
+// ─── POST /api/org/billing/cancel ─────────────────────────────────────────
+export async function cancelSubscription(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) { res.status(401).json({ success: false, error: "Auth required." }); return; }
+    const perm = await requireOrgRole(userId, ["OWNER"]);
+    if (!perm.allowed) { res.status(403).json({ success: false, error: perm.error }); return; }
+
+    const { cancelSubscription: cancel } = await import("../billing/razorpayService");
+    await cancel(perm.orgId!, userId);
+    res.json({ success: true, data: { message: "Subscription cancelled. Downgraded to Free." } });
+  } catch {
+    res.status(500).json({ success: false, error: "Cancellation failed." });
+  }
+}
+
+// ─── POST /api/org/billing/webhook/razorpay ───────────────────────────────
+export async function handleRazorpayWebhook(req: Request, res: Response): Promise<void> {
+  try {
+    const signature = req.headers["x-razorpay-signature"] as string ?? "";
+    const rawBody = JSON.stringify(req.body);
+
+    const { handleWebhook } = await import("../billing/razorpayService");
+    const result = await handleWebhook(rawBody, signature);
+
+    if (!result.handled) {
+      res.status(400).json({ success: false, error: "Webhook verification failed." });
+      return;
+    }
+    res.json({ success: true, data: result });
+  } catch {
+    res.status(500).json({ success: false, error: "Webhook processing failed." });
+  }
+}
