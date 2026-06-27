@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import * as svc from "../servers/serverService";
 import { getServerHealth as calculateServerHealth } from "../servers/healthService";
 import { askServerAI } from "../servers/serverAI";
+import { prisma } from "../database/db";
 import {
   broadcastMetricIfSubscribers,
   broadcastHeartbeat,
@@ -37,7 +38,9 @@ export async function createServer(req: Request, res: Response): Promise<void> {
       res.status(400).json({ success: false, error: "name and host are required." });
       return;
     }
-    const data = await svc.createServer({ name, host, provider, region, sshUser, sshPort, userId });
+    // Associate with user's organization if available
+    const orgId = (req as any).org?.id ?? undefined;
+    const data = await svc.createServer({ name, host, provider, region, sshUser, sshPort, userId, organizationId: orgId });
     res.status(201).json({ success: true, data });
   } catch (err) { res.status(500).json({ success: false, error: "Failed to create server." }); }
 }
@@ -53,8 +56,46 @@ export async function deleteServer(req: Request, res: Response): Promise<void> {
 // ─── GET /api/servers/:id/health ─────────────────────────────────────────
 export async function getServerHealth(req: Request, res: Response): Promise<void> {
   try {
-    const health = await calculateServerHealth(req.params.id);
-    res.json({ success: true, data: health });
+    const serverId = req.params.id;
+
+    // Return full server health data matching frontend expectations:
+    // { server: Server, apps: ServerApp[], latestMetric: MetricSnapshot | null }
+    const [serverData, apps, latestMetric] = await Promise.all([
+      svc.getServerById(serverId),
+      svc.getServerApps(serverId),
+      prisma.serverMetric.findFirst({
+        where: { serverId },
+        orderBy: { recordedAt: "desc" },
+      }),
+    ]);
+
+    if (!serverData) {
+      res.status(404).json({ success: false, error: "Server not found." });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        server: serverData,
+        apps,
+        latestMetric: latestMetric ? {
+          cpuPercent: latestMetric.cpuPercent,
+          ramPercent: latestMetric.ramPercent,
+          diskPercent: latestMetric.diskPercent,
+          networkIn: latestMetric.networkIn,
+          networkOut: latestMetric.networkOut,
+          cpuCores: latestMetric.cpuCores,
+          loadAverage: latestMetric.loadAverage,
+          memoryTotal: latestMetric.memoryTotal,
+          memoryUsed: latestMetric.memoryUsed,
+          memoryFree: latestMetric.memoryFree,
+          diskTotal: latestMetric.diskTotal,
+          diskUsed: latestMetric.diskUsed,
+          recordedAt: latestMetric.recordedAt.toISOString(),
+        } : null,
+      },
+    });
   } catch (err) { res.status(500).json({ success: false, error: "Failed to get health." }); }
 }
 

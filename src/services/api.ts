@@ -366,7 +366,12 @@ export async function fetchServerHealth(id: string): Promise<{
   latestMetric: ServerMetricSnapshot | null;
 } | null> {
   try { return await apiFetch(`/api/servers/${id}/health`); }
-  catch { return null; }
+  catch (err) {
+    // Don't swallow the error silently — let the UI know
+    if (err instanceof Error && err.message.includes("not found")) return null;
+    if (err instanceof Error && err.message.includes("access")) return null;
+    return null;
+  }
 }
 
 export async function fetchServerMetrics(id: string, limit = 60): Promise<ServerMetricSnapshot[]> {

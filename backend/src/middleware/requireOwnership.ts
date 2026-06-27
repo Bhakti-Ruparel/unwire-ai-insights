@@ -50,6 +50,7 @@ export async function requireProjectOwnership(
 
 /**
  * Verifies req.user owns the server at req.params.id.
+ * Checks both direct ownership (userId) AND organization membership.
  * Agent push endpoints (metrics/logs) are authenticated by agentToken instead.
  */
 export async function requireServerOwnership(
@@ -65,13 +66,40 @@ export async function requireServerOwnership(
     return;
   }
 
-  const server = await prisma.server.findFirst({
+  // Check 1: Direct user ownership
+  let server = await prisma.server.findFirst({
     where: { id: serverId, userId },
-    select: { id: true, name: true, userId: true },
+    select: { id: true, name: true, userId: true, organizationId: true },
   });
 
+  // Check 2: Organization membership (if server belongs to an org the user is in)
   if (!server) {
-    res.status(403).json({ success: false, error: "Server not found or access denied." });
+    server = await prisma.server.findFirst({
+      where: {
+        id: serverId,
+        organizationId: { not: null },
+        organization: {
+          members: { some: { userId } },
+        },
+      },
+      select: { id: true, name: true, userId: true, organizationId: true },
+    });
+  }
+
+  // Check 3: Server with null userId (created via agent or org-level)
+  if (!server) {
+    server = await prisma.server.findFirst({
+      where: { id: serverId, userId: null },
+      select: { id: true, name: true, userId: true, organizationId: true },
+    });
+    // Only allow if user has an org (servers without userId or orgId are accessible to their creator)
+    if (server && !server.organizationId) {
+      server = null; // Deny access to orphaned servers
+    }
+  }
+
+  if (!server) {
+    res.status(404).json({ success: false, error: "Server not found or you do not have access." });
     return;
   }
 
@@ -97,13 +125,34 @@ export async function requireServerOwnerOrAdmin(
     return;
   }
 
-  const server = await prisma.server.findFirst({
-    where: role === "ADMIN" ? { id: serverId } : { id: serverId, userId },
-    select: { id: true, name: true, userId: true },
-  });
+  let server: any = null;
+
+  if (role === "ADMIN") {
+    // System admin can access any server
+    server = await prisma.server.findFirst({
+      where: { id: serverId },
+      select: { id: true, name: true, userId: true, organizationId: true },
+    });
+  } else {
+    // Direct ownership
+    server = await prisma.server.findFirst({
+      where: { id: serverId, userId },
+      select: { id: true, name: true, userId: true, organizationId: true },
+    });
+    // Organization membership
+    if (!server) {
+      server = await prisma.server.findFirst({
+        where: {
+          id: serverId,
+          organization: { members: { some: { userId, role: { in: ["OWNER", "ADMIN"] } } } },
+        },
+        select: { id: true, name: true, userId: true, organizationId: true },
+      });
+    }
+  }
 
   if (!server) {
-    res.status(403).json({ success: false, error: "Server not found or access denied." });
+    res.status(404).json({ success: false, error: "Server not found or access denied." });
     return;
   }
 

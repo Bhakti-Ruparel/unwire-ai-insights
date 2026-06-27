@@ -1,0 +1,4 @@
+# Test environment data (ephemeral)
+node_modules/
+*.log
+tmp/

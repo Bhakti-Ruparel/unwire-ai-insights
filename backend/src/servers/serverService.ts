@@ -19,6 +19,7 @@ export interface CreateServerDTO {
   sshUser?: string;
   sshPort?: number;
   userId?: string;
+  organizationId?: string;
 }
 
 export interface ServerDTO {
@@ -154,7 +155,24 @@ export interface AgentTokenDTO {
 // ─── Servers CRUD ──────────────────────────────────────────────────────────
 
 export async function getAllServers(userId?: string): Promise<ServerDTO[]> {
-  const where = userId ? { userId } : {};
+  // Return servers owned directly by user OR belonging to user's organizations
+  let where: any = {};
+  if (userId) {
+    // Get user's organization IDs
+    const memberships = await prisma.organizationMember.findMany({
+      where: { userId },
+      select: { organizationId: true },
+    });
+    const orgIds = memberships.map(m => m.organizationId);
+
+    where = {
+      OR: [
+        { userId },
+        ...(orgIds.length > 0 ? [{ organizationId: { in: orgIds } }] : []),
+      ],
+    };
+  }
+
   const servers = await prisma.server.findMany({
     where,
     include: {
@@ -236,16 +254,17 @@ export async function createServer(data: CreateServerDTO): Promise<ServerDTO & {
   const agentToken = randomUUID();
   const server = await prisma.server.create({
     data: {
-      id:       randomUUID(),
-      name:     data.name,
-      host:     data.host,
-      provider: data.provider ?? "custom",
-      region:   data.region ?? "",
-      sshUser:  data.sshUser ?? "root",
-      sshPort:  data.sshPort ?? 22,
+      id:             randomUUID(),
+      name:           data.name,
+      host:           data.host,
+      provider:       data.provider ?? "custom",
+      region:         data.region ?? "",
+      sshUser:        data.sshUser ?? "root",
+      sshPort:        data.sshPort ?? 22,
       agentToken,
-      userId:   data.userId ?? null,
-      status:   "unknown",
+      userId:         data.userId ?? null,
+      organizationId: data.organizationId ?? null,
+      status:         "unknown",
     },
     include: {
       applications: { select: { id: true } },

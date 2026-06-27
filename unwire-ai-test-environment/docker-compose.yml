@@ -1,0 +1,90 @@
+version: "3.9"
+
+# Unwire AI Test Environment
+# Simulates a real customer server with applications, databases, and monitoring
+# Completely isolated from the main Unwire AI development setup
+
+services:
+  # ─── Simulated Customer Server ───────────────────────────────────────────
+  test-server:
+    build:
+      context: ./test-server
+      dockerfile: Dockerfile
+    container_name: unwire-test-server
+    hostname: test-production-server
+    restart: unless-stopped
+    ports:
+      - "2222:22"      # SSH access
+      - "4000:4000"    # Sample Node.js app
+      - "9898:9898"    # Unwire Agent command port
+    environment:
+      - UNWIRE_SERVER_URL=http://host.docker.internal:5000
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://testuser:testpass@test-postgres:5432/testdb
+      - REDIS_URL=redis://test-redis:6379
+    volumes:
+      - ./sample-apps:/opt/apps
+      - ./scripts:/scripts
+      - test-server-data:/opt/unwire
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - test-network
+    depends_on:
+      test-postgres:
+        condition: service_healthy
+      test-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ─── Test PostgreSQL Database ────────────────────────────────────────────
+  test-postgres:
+    image: postgres:16-alpine
+    container_name: unwire-test-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5433:5432"
+    volumes:
+      - test-pg-data:/var/lib/postgresql/data
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── Test Redis Cache ────────────────────────────────────────────────────
+  test-redis:
+    image: redis:7-alpine
+    container_name: unwire-test-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"
+    volumes:
+      - test-redis-data:/data
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  test-server-data:
+  test-pg-data:
+  test-redis-data:
+
+networks:
+  test-network:
+    driver: bridge
