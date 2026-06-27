@@ -1,4 +1,5 @@
 import { Router } from "express";
+import type { Request, Response, NextFunction } from "express";
 import * as ctrl from "../controllers/serverController";
 import { authenticate } from "../middleware/authenticate";
 import { requireAgentOrOwnership, requireServerOwnerOrAdmin, requireServerOwnership } from "../middleware/requireOwnership";
@@ -8,8 +9,32 @@ import { enforceServerLimit } from "../middleware/subscriptionGuard";
 import { withOrgContext } from "../middleware/organizationContext";
 import { validate } from "../middleware/validate";
 import { createServerSchema } from "../schemas";
+import { verifyToken } from "../services/authService";
 
 const router = Router();
+
+// SSE auth: supports token in query param (EventSource can't set headers)
+function sseAuth(req: Request, res: Response, next: NextFunction): void {
+  // Try standard Authorization header first
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      req.user = verifyToken(authHeader.slice(7));
+      next();
+      return;
+    } catch { /* fall through to query param */ }
+  }
+  // Fallback: token in query parameter
+  const queryToken = req.query.token as string;
+  if (queryToken) {
+    try {
+      req.user = verifyToken(queryToken);
+      next();
+      return;
+    } catch { /* invalid token */ }
+  }
+  res.status(401).json({ success: false, error: "Authentication required." });
+}
 
 // ─── CRUD — require authentication + org context ──────────────────────────
 router.get("/",    authenticate, withOrgContext, ctrl.listServers);
@@ -26,8 +51,8 @@ router.get("/:id/metrics",  authenticate, requireServerOwnership, ctrl.getServer
 router.post("/:id/metrics", agentPushLimiter, requireAgentOrOwnership, ctrl.pushMetrics);
 router.post("/:id/heartbeat", agentPushLimiter, requireAgentOrOwnership, ctrl.pushHeartbeat);
 
-// Real-time updates via Server Sent Events
-router.get("/:id/events", authenticate, requireServerOwnership, subscribeToServerEvents);
+// Real-time updates via Server Sent Events (supports token in query for EventSource)
+router.get("/:id/events", sseAuth, requireServerOwnership, subscribeToServerEvents);
 
 // Applications — user only
 router.get("/:id/apps",                  authenticate, requireServerOwnership, ctrl.getServerApps);

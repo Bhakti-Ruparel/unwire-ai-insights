@@ -496,7 +496,9 @@ function ServerDashboard() {
   const [metric,  setMetric]  = useState<ServerMetricSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
+  const [live,    setLive]    = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sseRef = useRef<EventSource | null>(null);
 
   const loadAll = useCallback(async () => {
     try {
@@ -509,12 +511,62 @@ function ServerDashboard() {
     finally { setLoading(false); }
   }, [serverId]);
 
+  // ── SSE real-time connection with polling fallback ───────────────────────
   useEffect(() => {
     setLoading(true);
     loadAll();
-    pollRef.current = setInterval(loadAll, 15000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [loadAll]);
+
+    // Try SSE connection for real-time updates
+    const token = localStorage.getItem("unwire_access_token");
+    const apiBase = (import.meta as any).env?.VITE_API_URL ?? "http://localhost:5000";
+    const sseUrl = `${apiBase}/api/servers/${serverId}/events?token=${token ?? ""}`;
+
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(sseUrl);
+      sseRef.current = es;
+
+      es.onopen = () => {
+        setLive(true);
+        // With SSE active, reduce polling to every 30s (for apps/server status refresh)
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = setInterval(loadAll, 30000);
+      };
+
+      es.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === "metric" && msg.data) {
+            setMetric(msg.data as ServerMetricSnapshot);
+          } else if (msg.type === "status" && msg.data) {
+            setServer((prev) => prev ? { ...prev, status: msg.data.status } : prev);
+          } else if (msg.type === "heartbeat" && msg.data) {
+            setServer((prev) => prev ? { ...prev, status: msg.data.status ?? "online" } : prev);
+          }
+        } catch { /* ignore malformed SSE messages */ }
+      };
+
+      es.onerror = () => {
+        // SSE failed — fall back to polling
+        setLive(false);
+        es?.close();
+        sseRef.current = null;
+        if (!pollRef.current) {
+          pollRef.current = setInterval(loadAll, 10000); // Faster polling as fallback
+        }
+      };
+    } catch {
+      // SSE not supported or connection failed — use polling
+      setLive(false);
+      pollRef.current = setInterval(loadAll, 10000);
+    }
+
+    return () => {
+      // Cleanup on unmount
+      if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    };
+  }, [serverId, loadAll]);
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) return (
@@ -580,7 +632,8 @@ function ServerDashboard() {
             <div className="flex items-center gap-2">
               {server.status === "online" ? (
                 <span className="flex items-center gap-1.5 text-xs text-green-400">
-                  <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />Live
+                  <span className={`h-2 w-2 rounded-full bg-green-400 ${live ? "animate-pulse" : ""}`} />
+                  {live ? "Live" : "Online"}
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

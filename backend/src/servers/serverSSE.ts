@@ -134,6 +134,15 @@ export async function broadcastMetricIfSubscribers(serverId: string): Promise<vo
         cpuPercent: metric.cpuPercent,
         ramPercent: metric.ramPercent,
         diskPercent: metric.diskPercent,
+        networkIn: metric.networkIn,
+        networkOut: metric.networkOut,
+        cpuCores: metric.cpuCores,
+        loadAverage: metric.loadAverage,
+        memoryTotal: metric.memoryTotal,
+        memoryUsed: metric.memoryUsed,
+        memoryFree: metric.memoryFree,
+        diskTotal: metric.diskTotal,
+        diskUsed: metric.diskUsed,
         recordedAt: metric.recordedAt.toISOString(),
       });
     }
