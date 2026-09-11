@@ -50,6 +50,9 @@ export async function registerAgent(req: Request, res: Response): Promise<void> 
 
     broadcastStatusChange(server.id, "online");
 
+    // Log agent registration for debugging
+    console.log(`[AGENT] ✓ Registered: server="${server.name}" id=${server.id} hostname=${hostname ?? "?"} os=${os ?? "?"} arch=${arch ?? "?"} ip=${req.ip ?? "?"}`);
+
     res.json({
       success: true,
       data: {

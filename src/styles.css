@@ -37,34 +37,33 @@
 
 :root {
   --radius: 0.75rem;
-  /* Dark-first design — :root mirrors dark */
-  --background: oklch(0.16 0.012 265);
-  --foreground: oklch(0.98 0.003 250);
-  --card: oklch(0.205 0.014 265 / 0.6);
-  --card-foreground: oklch(0.98 0.003 250);
-  --popover: oklch(0.18 0.014 265);
-  --popover-foreground: oklch(0.98 0.003 250);
-  --primary: oklch(0.72 0.18 265);
-  --primary-foreground: oklch(0.14 0.02 265);
-  --secondary: oklch(0.25 0.018 265);
-  --secondary-foreground: oklch(0.98 0.003 250);
-  --muted: oklch(0.23 0.014 265);
-  --muted-foreground: oklch(0.68 0.02 260);
-  --accent: oklch(0.78 0.16 195);
-  --accent-foreground: oklch(0.14 0.02 265);
-  --destructive: oklch(0.65 0.22 25);
-  --destructive-foreground: oklch(0.98 0.003 250);
-  --border: oklch(1 0 0 / 0.08);
-  --input: oklch(1 0 0 / 0.10);
-  --ring: oklch(0.72 0.18 265);
-  --glow: oklch(0.72 0.18 265);
-  --glow-2: oklch(0.78 0.16 195);
+  /* Light enterprise theme */
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F172A;
+  --primary: #2563EB;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #2563EB;
+  --accent-foreground: #FFFFFF;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #2563EB;
+  --glow: #2563EB;
+  --glow-2: #3B82F6;
 
-  --gradient-hero: radial-gradient(1200px 600px at 50% -10%, oklch(0.72 0.18 265 / 0.35), transparent 60%),
-                   radial-gradient(800px 400px at 90% 10%, oklch(0.78 0.16 195 / 0.20), transparent 60%);
-  --gradient-primary: linear-gradient(135deg, oklch(0.72 0.18 265), oklch(0.78 0.16 195));
-  --shadow-glow: 0 10px 60px -10px oklch(0.72 0.18 265 / 0.4);
-  --shadow-card: 0 1px 0 0 oklch(1 0 0 / 0.05) inset, 0 20px 40px -20px oklch(0 0 0 / 0.6);
+  --gradient-hero: radial-gradient(1200px 600px at 50% -10%, rgba(37, 99, 235, 0.08), transparent 60%);
+  --gradient-primary: linear-gradient(135deg, #2563EB, #3B82F6);
+  --shadow-glow: 0 4px 20px -4px rgba(37, 99, 235, 0.25);
+  --shadow-card: 0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.06);
 }
 
 @layer base {
@@ -72,25 +71,20 @@
   html, body { background-color: var(--color-background); color: var(--color-foreground); }
   body {
     font-family: var(--font-display);
-    background-image:
-      radial-gradient(1000px 500px at 20% -10%, oklch(0.72 0.18 265 / 0.12), transparent 60%),
-      radial-gradient(800px 400px at 90% 0%, oklch(0.78 0.16 195 / 0.08), transparent 60%);
-    background-attachment: fixed;
   }
-  ::selection { background: oklch(0.72 0.18 265 / 0.4); }
+  ::selection { background: rgba(37, 99, 235, 0.2); }
 }
 
 @utility glass {
-  background: color-mix(in oklab, var(--card) 70%, transparent);
-  backdrop-filter: blur(14px) saturate(140%);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-card);
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04), 0 1px 2px -1px rgba(0,0,0,0.04);
 }
 
 @utility glass-strong {
-  background: color-mix(in oklab, oklch(0.20 0.014 265) 85%, transparent);
-  backdrop-filter: blur(20px) saturate(160%);
-  border: 1px solid var(--color-border);
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.06);
 }
 
 @utility text-gradient {
@@ -102,10 +96,10 @@
 
 @utility btn-primary-grad {
   background: var(--gradient-primary);
-  color: oklch(0.14 0.02 265);
-  box-shadow: var(--shadow-glow);
-  transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
-  &:hover { transform: translateY(-1px); filter: brightness(1.05); }
+  color: white;
+  box-shadow: 0 2px 8px -2px rgba(37, 99, 235, 0.4);
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+  &:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.5); }
 }
 
 @utility grid-bg {

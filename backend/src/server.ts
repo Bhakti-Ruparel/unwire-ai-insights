@@ -14,6 +14,9 @@ import orgRoutes        from "./routes/orgRoutes";
 import dashboardRoutes  from "./routes/dashboardRoutes";
 import infraRoutes     from "./routes/infraRoutes";
 import agentPushRoutes from "./routes/agentPushRoutes";
+import softwareRoutes  from "./routes/softwareRoutes";
+import commandRoutes   from "./commands/commandRoutes";
+import installerRoutes from "./installer/installerRoutes";
 import { prisma } from "./database/db";
 import { authenticate, optionalAuth } from "./middleware/authenticate";
 import { globalLimiter, authLimiter, deploymentLimiter } from "./middleware/rateLimiter";
@@ -48,7 +51,7 @@ app.use(
       callback(new Error(`CORS: origin "${origin}" not allowed`));
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Organization-Id"],
     credentials: true,
   })
 );
@@ -81,11 +84,22 @@ app.use("/api/org",          orgRoutes);
 app.use("/api/dashboard",       dashboardRoutes);
 app.use("/api/infrastructure", infraRoutes);
 app.use("/api/agent-push",    agentPushRoutes);
+app.use("/api/software",      softwareRoutes);
+app.use("/api/commands",      commandRoutes);
 
-// Health check
+// Health check — verifiable by installer and monitoring
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    service: "unwire-ai-backend",
+    version: "1.0.0",
+    timestamp: new Date().toISOString(),
+    publicUrl: process.env.API_PUBLIC_URL || null,
+  });
 });
+
+// Installer script & agent downloads (no auth, no prefix)
+app.use(installerRoutes);
 
 // 404 fallback
 app.use((_req, res) => {

@@ -104,6 +104,10 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
+  // Send active organization context
+  const activeOrg = localStorage.getItem("unwire_active_org");
+  if (activeOrg) headers["X-Organization-Id"] = activeOrg;
+
   let res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
   // Auto-refresh on 401 (expired access token) — uses mutex to prevent concurrent refreshes

@@ -46,8 +46,9 @@ router.delete("/:id", authenticate, requireServerOwnership, ctrl.deleteServer);
 router.post("/:id/regenerate-token", authenticate, requireServerOwnerOrAdmin, ctrl.regenerateAgentToken);
 
 // Health & Metrics — user reads require ownership; agent push uses agent token
-router.get("/:id/health",   authenticate, requireServerOwnership, ctrl.getServerHealth);
-router.get("/:id/metrics",  authenticate, requireServerOwnership, ctrl.getServerMetrics);
+router.get("/:id/health",        authenticate, requireServerOwnership, ctrl.getServerHealth);
+router.get("/:id/agent-health",  authenticate, requireServerOwnership, ctrl.getAgentHealth);
+router.get("/:id/metrics",       authenticate, requireServerOwnership, ctrl.getServerMetrics);
 router.post("/:id/metrics", agentPushLimiter, requireAgentOrOwnership, ctrl.pushMetrics);
 router.post("/:id/heartbeat", agentPushLimiter, requireAgentOrOwnership, ctrl.pushHeartbeat);
 

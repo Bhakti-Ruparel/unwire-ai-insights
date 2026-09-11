@@ -797,14 +797,10 @@ function AgentTokenStep({ server, onDone }: { server: any; onDone: () => void })
     toast.success("Command copied!");
   }
 
-  const linuxCmd = `curl -fsSL https://get.unwire.ai/agent | bash && \\
-unwire-agent configure --token ${token} --server ${serverUrl} && \\
-unwire-agent start`;
+  const linuxCmd = `curl -fsSL ${serverUrl}/install.sh | sudo bash -s -- --token "${token}" --server "${serverUrl}"`;
 
   const windowsCmd = `# PowerShell (Run as Administrator)
-Invoke-WebRequest -Uri "https://get.unwire.ai/agent/windows" -OutFile unwire-agent.exe
-.\\unwire-agent.exe configure --token ${token} --server ${serverUrl}
-.\\unwire-agent.exe start`;
+irm "${serverUrl}/install.sh" | bash -s -- --token ${token} --server ${serverUrl}`;
 
   const dockerCmd = `docker run -d --name unwire-agent \\
   --restart unless-stopped \\

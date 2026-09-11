@@ -192,13 +192,18 @@ export async function getAllServers(userId?: string): Promise<ServerDTO[]> {
   return servers.map((s) => {
     const latestMetric = s.metrics[0] ? toMetricSnapshot(s.metrics[0]) : null;
     const heartbeat = s.heartbeats[0] ?? null;
+
+    // Compute LIVE status from heartbeat timestamp (source of truth)
+    const liveStatus = computeLiveStatus(heartbeat?.timestamp ?? null);
+    const healthScore = computeHealthScore(latestMetric, liveStatus, heartbeat?.timestamp ?? null);
+
     return {
       id: s.id,
       name: s.name,
       host: s.host,
       provider: s.provider,
       region: s.region,
-      status: s.status,
+      status: liveStatus,
       sshUser: s.sshUser,
       sshPort: s.sshPort,
       createdAt: s.createdAt.toISOString(),
@@ -206,7 +211,7 @@ export async function getAllServers(userId?: string): Promise<ServerDTO[]> {
       appCount: s.applications.length,
       agentTokenMasked: maskToken(s.agentToken),
       agentTokenLast6: tokenLast6(s.agentToken),
-      healthScore: computeHealthScore(latestMetric, s.status),
+      healthScore,
       lastSeenAt: heartbeat?.timestamp.toISOString() ?? null,
       lastSeenSecondsAgo: heartbeat ? Math.floor((Date.now() - heartbeat.timestamp.getTime()) / 1000) : null,
       latestMetric,
@@ -229,20 +234,24 @@ export async function getServerById(id: string, userId?: string): Promise<Server
   const latestMetric = server.metrics[0] ? toMetricSnapshot(server.metrics[0]) : null;
   const heartbeat = server.heartbeats[0] ?? null;
 
+  // Compute LIVE status from heartbeat timestamp
+  const liveStatus = computeLiveStatus(heartbeat?.timestamp ?? null);
+  const healthScore = computeHealthScore(latestMetric, liveStatus, heartbeat?.timestamp ?? null);
+
   return {
     id: server.id,
     name: server.name,
     host: server.host,
     provider: server.provider,
     region: server.region,
-    status: server.status,
+    status: liveStatus,
     sshUser: server.sshUser,
     sshPort: server.sshPort,
     createdAt: server.createdAt.toISOString(),
     updatedAt: server.updatedAt.toISOString(),
     agentTokenMasked: maskToken(server.agentToken),
     agentTokenLast6: tokenLast6(server.agentToken),
-    healthScore: computeHealthScore(latestMetric, server.status),
+    healthScore,
     lastSeenAt: heartbeat?.timestamp.toISOString() ?? null,
     lastSeenSecondsAgo: heartbeat ? Math.floor((Date.now() - heartbeat.timestamp.getTime()) / 1000) : null,
     appCount: server.applications.length,
@@ -701,12 +710,75 @@ function rangeStart(range: "1m" | "1h" | "24h" | "7d"): Date {
   return new Date(Date.now() - ms);
 }
 
-function computeHealthScore(metric: MetricSnapshot | null, status: string): number {
-  if (status === "offline") return 0;
-  if (!metric) return status === "online" ? 75 : 40;
-  const pressure = Math.max(metric.cpuPercent, metric.ramPercent, metric.diskPercent);
-  const base = status === "online" ? 100 : 70;
-  return Math.max(0, Math.min(100, Math.round(base - pressure * 0.45)));
+/**
+ * computeLiveStatus — derives server status from heartbeat timestamp.
+ * This is the ONLY source of truth for online/offline.
+ */
+function computeLiveStatus(lastHeartbeat: Date | null): string {
+  if (!lastHeartbeat) return "unknown"; // Never connected
+
+  const secondsAgo = (Date.now() - lastHeartbeat.getTime()) / 1000;
+  if (secondsAgo < 60) return "online";       // < 1 min = healthy
+  if (secondsAgo < 300) return "degraded";    // 1-5 min = unstable/warning
+  return "offline";                            // > 5 min = offline
+}
+
+/**
+ * computeHealthScore — real health calculation based on:
+ *   Availability (40%) — heartbeat recency
+ *   CPU (20%) — usage percentage
+ *   RAM (20%) — usage percentage
+ *   Disk (10%) — usage percentage
+ *   Stability (10%) — uptime consistency
+ */
+function computeHealthScore(metric: MetricSnapshot | null, status: string, lastHeartbeat: Date | null): number {
+  // Offline = immediate low score
+  if (status === "offline") {
+    const minutesDown = lastHeartbeat ? Math.floor((Date.now() - lastHeartbeat.getTime()) / 60000) : 999;
+    return Math.max(0, Math.min(20, 20 - minutesDown)); // 0-20 range when offline
+  }
+
+  // Unknown (never connected) = 0
+  if (status === "unknown") return 0;
+
+  // Degraded = cap at 60
+  const maxScore = status === "degraded" ? 60 : 100;
+
+  let score = 0;
+
+  // Availability (40 points) — based on heartbeat recency
+  if (lastHeartbeat) {
+    const secsAgo = (Date.now() - lastHeartbeat.getTime()) / 1000;
+    if (secsAgo < 30) score += 40;
+    else if (secsAgo < 60) score += 35;
+    else if (secsAgo < 120) score += 25;
+    else if (secsAgo < 300) score += 10;
+  }
+
+  if (!metric) return Math.min(score, maxScore);
+
+  // CPU (20 points)
+  if (metric.cpuPercent < 70) score += 20;
+  else if (metric.cpuPercent < 85) score += 12;
+  else if (metric.cpuPercent < 95) score += 5;
+  // >95% = 0 points
+
+  // RAM (20 points)
+  if (metric.ramPercent < 75) score += 20;
+  else if (metric.ramPercent < 85) score += 12;
+  else if (metric.ramPercent < 95) score += 5;
+
+  // Disk (10 points)
+  if (metric.diskPercent < 80) score += 10;
+  else if (metric.diskPercent < 90) score += 6;
+  else if (metric.diskPercent < 95) score += 2;
+
+  // Stability bonus (10 points) — if all metrics are healthy
+  if (metric.cpuPercent < 50 && metric.ramPercent < 60 && metric.diskPercent < 60) {
+    score += 10;
+  }
+
+  return Math.min(score, maxScore);
 }
 
 function normalizeLogLevel(level?: string): string {

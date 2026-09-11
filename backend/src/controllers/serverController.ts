@@ -99,6 +99,35 @@ export async function getServerHealth(req: Request, res: Response): Promise<void
   } catch (err) { res.status(500).json({ success: false, error: "Failed to get health." }); }
 }
 
+// ─── GET /api/servers/:id/agent-health ────────────────────────────────────
+export async function getAgentHealth(req: Request, res: Response): Promise<void> {
+  try {
+    const { getAgentHealth: checkHealth } = await import("../deployment/agentClient");
+    const health = await checkHealth(req.params.id);
+
+    // Also get last heartbeat from DB
+    const lastHb = await prisma.serverHeartbeat.findFirst({
+      where: { serverId: req.params.id },
+      orderBy: { timestamp: "desc" },
+      select: { timestamp: true, agentVersion: true, ip: true },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        connected: health.connected,
+        latencyMs: health.latencyMs,
+        endpoint: health.endpoint,
+        agentVersion: health.agentVersion ?? lastHb?.agentVersion ?? null,
+        lastHeartbeat: lastHb?.timestamp?.toISOString() ?? null,
+        lastIp: lastHb?.ip ?? null,
+      },
+    });
+  } catch {
+    res.status(500).json({ success: false, error: "Failed to check agent health." });
+  }
+}
+
 // ─── GET /api/servers/:id/metrics ─────────────────────────────────────────
 export async function getServerMetrics(req: Request, res: Response): Promise<void> {
   try {
@@ -138,10 +167,19 @@ export async function pushMetrics(req: Request, res: Response): Promise<void> {
 // POST /api/servers/:id/heartbeat
 export async function pushHeartbeat(req: Request, res: Response): Promise<void> {
   try {
-    await svc.updateServerStatus(req.params.id, "online");
+    const serverId = req.params.id;
+
+    // Record heartbeat in database (this is what computeLiveStatus reads)
+    await svc.recordHeartbeat(serverId, {
+      status: "online",
+      agentVersion: req.body.agentVersion ?? "",
+    }, req.ip ?? "");
+
+    // Also update the static status field for backward compat
+    await svc.updateServerStatus(serverId, "online");
     
     // Broadcast to SSE subscribers
-    broadcastHeartbeat(req.params.id, "online");
+    broadcastHeartbeat(serverId, "online");
     
     res.json({ success: true, data: { message: "Heartbeat received." } });
   } catch (err) {

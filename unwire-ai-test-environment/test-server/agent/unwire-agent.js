@@ -104,6 +104,9 @@ async function handleStart() {
   log('✓ Agent running. Sending data every 10s...');
   log('');
 
+  // Start command execution server on port 9898
+  startCommandServer(config.token);
+
   // Initial send
   await collectAndSend(config);
 
@@ -329,4 +332,111 @@ function getArg(flag) {
 
 function log(msg) {
   console.log(`[unwire-agent] ${msg}`);
+}
+
+// ─── Command Execution Server (port 9898) ─────────────────────────────────
+// Receives deployment/install commands from the Unwire AI backend
+
+const { exec } = require('child_process');
+
+function startCommandServer(agentToken) {
+  const server = http.createServer((req, res) => {
+    // Health endpoint
+    if (req.method === 'GET' && req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', version: VERSION }));
+      return;
+    }
+
+    // Deploy/exec endpoint
+    if (req.method === 'POST' && req.url === '/deploy') {
+      // Verify auth
+      const auth = req.headers['authorization'] || '';
+      if (auth !== `Bearer ${agentToken}`) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ exitCode: -1, error: 'unauthorized' }));
+        return;
+      }
+
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          const request = JSON.parse(body);
+          handleDeployRequest(request, res);
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ exitCode: -1, error: 'invalid request' }));
+        }
+      });
+      return;
+    }
+
+    res.writeHead(404);
+    res.end('not found');
+  });
+
+  server.listen(9898, '0.0.0.0', () => {
+    log('✓ Command server listening on :9898');
+  });
+}
+
+function handleDeployRequest(request, res) {
+  const { action, repository, appName, timeout } = request;
+  const timeoutMs = (timeout || 300) * 1000;
+
+  let command = '';
+
+  switch (action) {
+    case 'exec':
+      // Direct command execution (whitelisted in backend registry)
+      command = repository || '';
+      break;
+    case 'clone':
+      // Could be a git clone OR a shell command (legacy compatibility)
+      command = repository || '';
+      break;
+    case 'build':
+      command = `docker build -t unwire-${appName}:latest /opt/unwire/deployments/${appName}`;
+      break;
+    case 'deploy':
+      command = `docker run -d --name unwire-${appName} --restart unless-stopped -p ${request.port || 3000}:${request.port || 3000} unwire-${appName}:latest`;
+      break;
+    case 'healthcheck':
+      command = `curl -sf http://localhost:${request.port || 3000}/health || curl -sf http://localhost:${request.port || 3000}/`;
+      break;
+    case 'stop':
+      command = `docker stop unwire-${appName} 2>/dev/null; docker rm unwire-${appName} 2>/dev/null`;
+      break;
+    default:
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ exitCode: -1, stdout: '', stderr: '', error: `unknown action: ${action}` }));
+      return;
+  }
+
+  if (!command) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ exitCode: -1, stdout: '', stderr: '', error: 'no command to execute' }));
+    return;
+  }
+
+  log(`[cmd] Executing: ${command.slice(0, 100)}`);
+  const start = Date.now();
+
+  const child = exec(command, { timeout: timeoutMs, maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
+    const durationMs = Date.now() - start;
+    const exitCode = error ? (error.code || 1) : 0;
+
+    if (stdout) log(`[cmd] stdout: ${stdout.slice(0, 200)}`);
+    if (stderr && exitCode !== 0) log(`[cmd] stderr: ${stderr.slice(0, 200)}`);
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      exitCode,
+      stdout: (stdout || '').slice(0, 50000),
+      stderr: (stderr || '').slice(0, 10000),
+      durationMs,
+      error: error ? error.message : undefined,
+    }));
+  });
 }

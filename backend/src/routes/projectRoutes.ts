@@ -60,4 +60,9 @@ router.get("/:id/deployment",       authenticate, requireProjectOwnership, contr
 router.post("/:id/deployment/refresh", authenticate, requireProjectOwnership, controller.refreshDeployment);
 router.get("/:id/deployment-plan",  authenticate, requireProjectOwnership, getDeploymentPlan);
 
+// Environment variables (encrypted, for deployments)
+router.get("/:id/env-vars",         authenticate, requireProjectOwnership, controller.getEnvVars);
+router.put("/:id/env-vars",         authenticate, requireProjectOwnership, controller.setEnvVars);
+router.delete("/:id/env-vars/:key", authenticate, requireProjectOwnership, controller.deleteEnvVar);
+
 export default router;

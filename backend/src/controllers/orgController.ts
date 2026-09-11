@@ -286,10 +286,30 @@ export async function removeMember(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.userId;
     if (!userId) { res.status(401).json({ success: false, error: "Auth required." }); return; }
-    const orgId = await getOrgId(userId);
+
+    const orgId = req.org?.id;
     if (!orgId) { res.status(404).json({ success: false, error: "No organization found." }); return; }
+
     const targetId = req.params.userId;
-    if (targetId === userId) { res.status(400).json({ success: false, error: "Cannot remove yourself." }); return; }
+    if (targetId === userId) {
+      res.status(400).json({ success: false, error: "Cannot remove yourself." }); return;
+    }
+
+    // Cannot remove someone with equal or higher role
+    const targetMember = await prisma.organizationMember.findFirst({
+      where: { organizationId: orgId, userId: targetId },
+      select: { role: true },
+    });
+    if (!targetMember) {
+      res.status(404).json({ success: false, error: "Member not found." }); return;
+    }
+    if (targetMember.role === "OWNER") {
+      res.status(403).json({ success: false, error: "Cannot remove the organization owner." }); return;
+    }
+    if (targetMember.role === "ADMIN" && req.org?.role !== "OWNER") {
+      res.status(403).json({ success: false, error: "Only the owner can remove admins." }); return;
+    }
+
     await prisma.organizationMember.deleteMany({ where: { organizationId: orgId, userId: targetId } });
     recordAudit({ organizationId: orgId, userId, action: "member.removed", metadata: { targetId } });
     res.json({ success: true, data: { message: "Member removed." } });
@@ -301,16 +321,46 @@ export async function updateMemberRole(req: Request, res: Response): Promise<voi
   try {
     const userId = req.user?.userId;
     if (!userId) { res.status(401).json({ success: false, error: "Auth required." }); return; }
-    const orgId = await getOrgId(userId);
+
+    const orgId = req.org?.id;
     if (!orgId) { res.status(404).json({ success: false, error: "No organization found." }); return; }
+
     const { role } = req.body as { role?: string };
-    if (!role || !["OWNER", "ADMIN", "DEVELOPER", "VIEWER"].includes(role)) {
-      res.status(400).json({ success: false, error: "Valid role required." }); return;
+    if (!role || !["ADMIN", "MEMBER", "DEVELOPER"].includes(role)) {
+      res.status(400).json({ success: false, error: "Valid role required (ADMIN, MEMBER, DEVELOPER)." }); return;
     }
+
+    const targetId = req.params.userId;
+
+    // Cannot change own role
+    if (targetId === userId) {
+      res.status(400).json({ success: false, error: "Cannot change your own role." }); return;
+    }
+
+    // Only OWNER can promote to ADMIN
+    if (role === "ADMIN" && req.org?.role !== "OWNER") {
+      res.status(403).json({ success: false, error: "Only the owner can promote to admin." }); return;
+    }
+
+    // Cannot change OWNER role at all
+    const targetMember = await prisma.organizationMember.findFirst({
+      where: { organizationId: orgId, userId: targetId },
+      select: { role: true },
+    });
+    if (targetMember?.role === "OWNER") {
+      res.status(403).json({ success: false, error: "Cannot change the owner's role." }); return;
+    }
+
+    // ADMIN cannot demote other ADMINs
+    if (targetMember?.role === "ADMIN" && req.org?.role !== "OWNER") {
+      res.status(403).json({ success: false, error: "Only the owner can change admin roles." }); return;
+    }
+
     await prisma.organizationMember.updateMany({
-      where: { organizationId: orgId, userId: req.params.userId },
+      where: { organizationId: orgId, userId: targetId },
       data: { role },
     });
+    recordAudit({ organizationId: orgId, userId, action: "member.role_updated", metadata: { targetId, newRole: role } });
     res.json({ success: true, data: { message: "Role updated." } });
   } catch { res.status(500).json({ success: false, error: "Failed to update role." }); }
 }

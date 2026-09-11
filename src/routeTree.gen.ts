@@ -27,6 +27,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServersIndexRouteImport } from './routes/servers.index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
 import { Route as ServersServerIdRouteImport } from './routes/servers.$serverId'
+import { Route as ServerSoftwareServerIdRouteImport } from './routes/server-software.$serverId'
+import { Route as ServerCommandsServerIdRouteImport } from './routes/server-commands.$serverId'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects.$projectId'
 import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as DeploymentsDeploymentIdRouteImport } from './routes/deployments.$deploymentId'
@@ -131,6 +133,16 @@ const ServersServerIdRoute = ServersServerIdRouteImport.update({
   path: '/servers/$serverId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ServerSoftwareServerIdRoute = ServerSoftwareServerIdRouteImport.update({
+  id: '/server-software/$serverId',
+  path: '/server-software/$serverId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ServerCommandsServerIdRoute = ServerCommandsServerIdRouteImport.update({
+  id: '/server-commands/$serverId',
+  path: '/server-commands/$serverId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   id: '/projects/$projectId',
   path: '/projects/$projectId',
@@ -223,6 +235,8 @@ export interface FileRoutesByFullPath {
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
   '/invite/$token': typeof InviteTokenRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/server-commands/$serverId': typeof ServerCommandsServerIdRoute
+  '/server-software/$serverId': typeof ServerSoftwareServerIdRoute
   '/servers/$serverId': typeof ServersServerIdRoute
   '/projects/': typeof ProjectsIndexRoute
   '/servers/': typeof ServersIndexRoute
@@ -255,6 +269,8 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
   '/invite/$token': typeof InviteTokenRoute
+  '/server-commands/$serverId': typeof ServerCommandsServerIdRoute
+  '/server-software/$serverId': typeof ServerSoftwareServerIdRoute
   '/servers/$serverId': typeof ServersServerIdRoute
   '/projects': typeof ProjectsIndexRoute
   '/servers': typeof ServersIndexRoute
@@ -289,6 +305,8 @@ export interface FileRoutesById {
   '/deployments/$deploymentId': typeof DeploymentsDeploymentIdRoute
   '/invite/$token': typeof InviteTokenRoute
   '/projects/$projectId': typeof ProjectsProjectIdRouteWithChildren
+  '/server-commands/$serverId': typeof ServerCommandsServerIdRoute
+  '/server-software/$serverId': typeof ServerSoftwareServerIdRoute
   '/servers/$serverId': typeof ServersServerIdRoute
   '/projects/': typeof ProjectsIndexRoute
   '/servers/': typeof ServersIndexRoute
@@ -324,6 +342,8 @@ export interface FileRouteTypes {
     | '/deployments/$deploymentId'
     | '/invite/$token'
     | '/projects/$projectId'
+    | '/server-commands/$serverId'
+    | '/server-software/$serverId'
     | '/servers/$serverId'
     | '/projects/'
     | '/servers/'
@@ -356,6 +376,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/deployments/$deploymentId'
     | '/invite/$token'
+    | '/server-commands/$serverId'
+    | '/server-software/$serverId'
     | '/servers/$serverId'
     | '/projects'
     | '/servers'
@@ -389,6 +411,8 @@ export interface FileRouteTypes {
     | '/deployments/$deploymentId'
     | '/invite/$token'
     | '/projects/$projectId'
+    | '/server-commands/$serverId'
+    | '/server-software/$serverId'
     | '/servers/$serverId'
     | '/projects/'
     | '/servers/'
@@ -423,6 +447,8 @@ export interface RootRouteChildren {
   DeploymentsDeploymentIdRoute: typeof DeploymentsDeploymentIdRoute
   InviteTokenRoute: typeof InviteTokenRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRouteWithChildren
+  ServerCommandsServerIdRoute: typeof ServerCommandsServerIdRoute
+  ServerSoftwareServerIdRoute: typeof ServerSoftwareServerIdRoute
   ServersServerIdRoute: typeof ServersServerIdRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
   ServersIndexRoute: typeof ServersIndexRoute
@@ -554,6 +580,20 @@ declare module '@tanstack/react-router' {
       path: '/servers/$serverId'
       fullPath: '/servers/$serverId'
       preLoaderRoute: typeof ServersServerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/server-software/$serverId': {
+      id: '/server-software/$serverId'
+      path: '/server-software/$serverId'
+      fullPath: '/server-software/$serverId'
+      preLoaderRoute: typeof ServerSoftwareServerIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/server-commands/$serverId': {
+      id: '/server-commands/$serverId'
+      path: '/server-commands/$serverId'
+      fullPath: '/server-commands/$serverId'
+      preLoaderRoute: typeof ServerCommandsServerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projects/$projectId': {
@@ -698,6 +738,8 @@ const rootRouteChildren: RootRouteChildren = {
   DeploymentsDeploymentIdRoute: DeploymentsDeploymentIdRoute,
   InviteTokenRoute: InviteTokenRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRouteWithChildren,
+  ServerCommandsServerIdRoute: ServerCommandsServerIdRoute,
+  ServerSoftwareServerIdRoute: ServerSoftwareServerIdRoute,
   ServersServerIdRoute: ServersServerIdRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
   ServersIndexRoute: ServersIndexRoute,

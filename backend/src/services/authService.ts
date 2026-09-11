@@ -150,18 +150,47 @@ export async function loginUser(
 // ─── Refresh ───────────────────────────────────────────────────────────────
 
 export async function refreshAccessToken(refreshToken: string): Promise<AuthTokens> {
-  const session = await prisma.session.findUnique({ where: { refreshToken } });
-  if (!session || session.expiresAt < new Date()) {
-    if (session) await prisma.session.delete({ where: { id: session.id } });
-    throw new Error("Refresh token expired or invalid. Please log in again.");
-  }
+  // Atomic transaction: find + delete + create in one DB round-trip
+  // Prevents TOCTOU race when two requests use the same refresh token simultaneously
+  return prisma.$transaction(async (tx) => {
+    // Attempt to delete the session atomically — if it doesn't exist (already consumed), this returns null
+    const session = await tx.session.findUnique({ where: { refreshToken } });
+    if (!session) {
+      throw new Error("Refresh token expired or invalid. Please log in again.");
+    }
 
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
-  if (!user || !user.isActive) throw new Error("User not found or disabled.");
+    if (session.expiresAt < new Date()) {
+      await tx.session.delete({ where: { id: session.id } });
+      throw new Error("Refresh token expired. Please log in again.");
+    }
 
-  // Rotate refresh token
-  await prisma.session.delete({ where: { id: session.id } });
-  return buildTokens(user.id, user.email, user.role, session.userAgent, session.ipAddress);
+    // Delete the used token (consume it — prevents reuse)
+    await tx.session.delete({ where: { id: session.id } });
+
+    const user = await tx.user.findUnique({ where: { id: session.userId } });
+    if (!user || !user.isActive) throw new Error("User not found or disabled.");
+
+    // Create new session with rotated token
+    const newRefreshToken = crypto.randomBytes(64).toString("hex");
+    const expiresAt = new Date(Date.now() + REFRESH_TTL_MS);
+
+    await tx.session.create({
+      data: {
+        id: crypto.randomUUID(),
+        userId: user.id,
+        refreshToken: newRefreshToken,
+        expiresAt,
+        userAgent: session.userAgent,
+        ipAddress: session.ipAddress,
+      },
+    });
+
+    const accessToken = signAccessToken({ userId: user.id, email: user.email, role: user.role });
+    return { accessToken, refreshToken: newRefreshToken };
+  }, {
+    isolationLevel: "Serializable", // Prevents concurrent reads of same token
+    timeout: 10000,
+  });
 }
 
 // ─── Logout ────────────────────────────────────────────────────────────────

@@ -143,11 +143,22 @@ export async function runDeploymentPipeline(
     // ── Step 4: Write deployment files ──────────────────────────────────
     await runStep(deploymentId, stepIds[4], "Write Files", log, async () => {
       await log("info", "Write Files", "Writing Dockerfile, docker-compose.yml, .env");
+
+      // Get user-configured env vars (decrypted) — fall back to plan examples
+      const { getDecryptedEnvVars } = await import("./envVarService");
+      let envVars = await getDecryptedEnvVars(dep.projectId);
+      if (Object.keys(envVars).length === 0) {
+        envVars = buildEnvMap(plan.environmentVariables);
+        await log("warn", "Write Files", "No environment variables configured. Using defaults — configure via Settings.");
+      } else {
+        await log("info", "Write Files", `Using ${Object.keys(envVars).length} configured environment variables`);
+      }
+
       const result = await sendAgentCommand(dep.serverId, {
         deploymentId,
         action: "write_files",
         files: files as any,
-        envVars: buildEnvMap(plan.environmentVariables),
+        envVars,
         appName: appSlug,
         timeout: 30,
       });
@@ -405,9 +416,10 @@ function makeLogger(deploymentId: string) {
 }
 
 function buildEnvMap(envVars: Array<{ key: string; example: string }>): Record<string, string> {
+  // This is only used as fallback when no user-configured env vars exist
   const map: Record<string, string> = {};
   for (const v of envVars) {
-    map[v.key] = v.example; // In production, user provides real values
+    map[v.key] = v.example;
   }
   return map;
 }

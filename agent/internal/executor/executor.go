@@ -39,13 +39,30 @@ var allowedCommands = []string{
 	"git clone", "git pull", "git checkout", "git fetch",
 	"docker build", "docker compose", "docker-compose",
 	"docker run", "docker stop", "docker rm", "docker ps",
-	"docker pull", "docker images", "docker network",
+	"docker pull", "docker images", "docker network", "docker volume",
 	"npm install", "npm ci", "npm run", "npm start",
 	"yarn install", "yarn build", "yarn start",
 	"pnpm install", "pnpm build", "pnpm start",
 	"pip install", "python", "uvicorn",
-	"mkdir", "cp", "mv", "chmod", "cat", "ls",
+	"mkdir", "cp", "mv", "chmod", "cat", "ls", "rm",
 	"curl", "wget", "systemctl",
+	// Package managers (for software installation)
+	"sudo apt-get", "sudo apt", "apt-get", "apt",
+	"sudo yum", "yum",
+	"sudo dnf", "dnf",
+	"brew install", "brew uninstall", "brew upgrade", "brew services", "brew tap",
+	"winget install", "winget uninstall", "winget upgrade",
+	"sudo snap", "snap install",
+	// Version checks
+	"node --version", "python3 --version", "python --version",
+	"go version", "java --version", "psql --version",
+	"redis-cli", "nginx -v", "docker --version",
+	"mongosh", "mysql --version", "terraform --version",
+	"kubectl version", "pm2 --version", "certbot --version",
+	"git --version", "uname",
+	// Service management
+	"sudo service", "service",
+	"echo", "which", "type", "command -v",
 }
 
 // Execute runs a whitelisted command with timeout.
@@ -116,9 +133,28 @@ func ExecuteDeployAction(req *DeployRequest, reportFn func(step, message, level 
 		return executeStop(ctx, req, reportFn)
 	case "rollback":
 		return executeRollback(ctx, req, reportFn)
+	case "exec":
+		// Generic whitelisted command execution (for software install/uninstall)
+		return executeShellCommand(ctx, req, timeout, reportFn)
 	default:
 		return &CommandResult{ExitCode: -1, Error: fmt.Sprintf("unknown action: %s", req.Action)}
 	}
+}
+
+// executeShellCommand runs a whitelisted shell command directly.
+func executeShellCommand(ctx context.Context, req *DeployRequest, timeout int, report func(string, string, string)) *CommandResult {
+	cmd := req.Repository // Command passed in repository field
+	if cmd == "" {
+		return &CommandResult{ExitCode: -1, Error: "no command specified"}
+	}
+	report("Exec", fmt.Sprintf("Running: %s", cmd), "info")
+	result := Execute(ctx, cmd, req.WorkDir, timeout)
+	if result.ExitCode == 0 {
+		report("Exec", "✓ Command completed", "info")
+	} else {
+		report("Exec", fmt.Sprintf("✗ Exit code: %d", result.ExitCode), "error")
+	}
+	return result
 }
 
 func executeClone(ctx context.Context, req *DeployRequest, report func(string, string, string)) *CommandResult {

@@ -274,3 +274,63 @@ export async function refreshDeployment(req: Request, res: Response): Promise<vo
     res.status(500).json({ success: false, error: "Failed to trigger deployment analysis." });
   }
 }
+
+
+// ─── Environment Variables ────────────────────────────────────────────────
+
+export async function getEnvVars(req: Request, res: Response): Promise<void> {
+  try {
+    const { getProjectEnvVars } = await import("../deployment/envVarService");
+    const vars = await getProjectEnvVars(req.params.id);
+    res.json({ success: true, data: vars });
+  } catch {
+    res.status(500).json({ success: false, error: "Failed to fetch environment variables." });
+  }
+}
+
+export async function setEnvVars(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) { res.status(401).json({ success: false, error: "Auth required." }); return; }
+
+    const { vars } = req.body as { vars?: Array<{ key: string; value: string; isSecret?: boolean }> };
+    if (!Array.isArray(vars)) {
+      res.status(400).json({ success: false, error: "vars must be an array of {key, value, isSecret}." });
+      return;
+    }
+
+    // Validate entries
+    for (const v of vars) {
+      if (!v.key || typeof v.key !== "string") {
+        res.status(400).json({ success: false, error: "Each var must have a key." });
+        return;
+      }
+    }
+
+    const { setProjectEnvVars } = await import("../deployment/envVarService");
+    await setProjectEnvVars(
+      req.params.id,
+      vars.map(v => ({ key: v.key.trim(), value: v.value ?? "", isSecret: v.isSecret ?? false })),
+      userId,
+      (req as any).org?.id
+    );
+
+    res.json({ success: true, data: { saved: vars.length } });
+  } catch {
+    res.status(500).json({ success: false, error: "Failed to save environment variables." });
+  }
+}
+
+export async function deleteEnvVar(req: Request, res: Response): Promise<void> {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) { res.status(401).json({ success: false, error: "Auth required." }); return; }
+
+    const { deleteProjectEnvVar } = await import("../deployment/envVarService");
+    await deleteProjectEnvVar(req.params.id, req.params.key, userId);
+
+    res.json({ success: true, data: { deleted: req.params.key } });
+  } catch {
+    res.status(500).json({ success: false, error: "Failed to delete environment variable." });
+  }
+}

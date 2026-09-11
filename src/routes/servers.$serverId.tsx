@@ -74,14 +74,24 @@ const STATUS_BADGE: Record<string, string> = {
 
 // ─── Health Score Ring ────────────────────────────────────────────────────
 
-function HealthScoreRing({ score }: { score: number }) {
+function HealthScoreRing({ score, serverStatus }: { score: number; serverStatus?: string }) {
   const radius = 45;
   const circ = 2 * Math.PI * radius;
   const offset = circ - (score / 100) * circ;
-  const color = score >= 75 ? "#22c55e" : score >= 50 ? "#eab308" : "#ef4444";
-  const status = score >= 75 ? "Healthy" : score >= 50 ? "Warning" : "Critical";
-  const msg = score >= 75 ? "Good job! Your server is running well." :
-    score >= 50 ? "Some issues detected. Monitor closely." : "Immediate attention needed.";
+  const color = score >= 75 ? "#22c55e" : score >= 50 ? "#eab308" : score > 20 ? "#f97316" : "#ef4444";
+
+  let status: string, msg: string;
+  if (serverStatus === "offline" || score <= 20) {
+    status = "Offline"; msg = "Server is unreachable. Check agent connection.";
+  } else if (serverStatus === "unknown" || score === 0) {
+    status = "Unknown"; msg = "No data received yet. Install and start the agent.";
+  } else if (score >= 75) {
+    status = "Healthy"; msg = "All systems operating normally.";
+  } else if (score >= 50) {
+    status = "Warning"; msg = "Elevated resource usage detected.";
+  } else {
+    status = "Critical"; msg = "High resource pressure. Investigate immediately.";
+  }
 
   return (
     <div className="glass rounded-2xl p-5 flex flex-col items-center gap-3">
@@ -121,11 +131,13 @@ function MetricOverviewCard({ label, value, sub, icon: Icon }: {
       </div>
       <div className={`text-2xl font-bold font-mono ${color}`}>{value}</div>
       {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
-      {/* Mini sparkline placeholder */}
+      {/* Metric bar — uses actual current value as indicator */}
       <div className="mt-2 h-6 flex items-end gap-[2px]">
         {Array.from({ length: 12 }, (_, i) => {
-          const h = 20 + Math.random() * 80;
-          return <div key={i} className="flex-1 rounded-sm bg-primary/30" style={{ height: `${h}%` }} />;
+          // Show a single bar representing current value (last bar is current)
+          const isLast = i === 11;
+          const h = isLast ? Math.max(10, numVal || 20) : 15;
+          return <div key={i} className={`flex-1 rounded-sm ${isLast ? "bg-primary/60" : "bg-primary/15"}`} style={{ height: `${h}%` }} />;
         })}
       </div>
     </div>
@@ -480,7 +492,60 @@ function AgentInfoPanel({ server }: { server: Server }) {
             className="w-full text-[11px] px-3 py-1.5 rounded-lg glass border border-border/50 hover:border-yellow-500/50 text-muted-foreground hover:text-yellow-400 transition disabled:opacity-50">
             {regenerating ? "Regenerating..." : "🔑 Regenerate Token"}
           </button>
+          <DeleteServerButton serverId={server.id} serverName={server.name} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function DeleteServerButton({ serverId, serverName }: { serverId: string; serverName: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const navigate = (window as any).__tanstack_navigate; // Will use link instead
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const token = localStorage.getItem("unwire_access_token");
+      const orgId = localStorage.getItem("unwire_active_org");
+      const headers: Record<string,string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (orgId) headers["X-Organization-Id"] = orgId;
+
+      const res = await fetch(`${(import.meta as any).env?.VITE_API_URL ?? "http://localhost:5000"}/api/servers/${serverId}`, {
+        method: "DELETE", headers,
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
+      toast.success("Server deleted.");
+      window.location.href = "/servers";
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to delete server.");
+    }
+    setDeleting(false);
+    setConfirming(false);
+  }
+
+  if (!confirming) {
+    return (
+      <button onClick={() => setConfirming(true)}
+        className="w-full text-[11px] px-3 py-1.5 rounded-lg glass border border-red-500/20 text-muted-foreground hover:text-red-400 hover:border-red-500/40 transition">
+        🗑️ Delete Server
+      </button>
+    );
+  }
+
+  return (
+    <div className="glass rounded-lg p-3 border border-red-500/30 space-y-2">
+      <div className="text-[11px] text-red-400 font-medium">Delete "{serverName}"?</div>
+      <div className="text-[10px] text-muted-foreground">This will permanently remove all metrics, logs, alerts, and agent connection.</div>
+      <div className="flex gap-2">
+        <button onClick={() => setConfirming(false)} className="flex-1 text-[10px] px-2 py-1.5 rounded glass hover:bg-secondary/60">Cancel</button>
+        <button onClick={handleDelete} disabled={deleting}
+          className="flex-1 text-[10px] px-2 py-1.5 rounded bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 disabled:opacity-50">
+          {deleting ? "Deleting..." : "Confirm Delete"}
+        </button>
       </div>
     </div>
   );
@@ -591,61 +656,55 @@ function ServerDashboard() {
     </DashboardLayout></AuthGuard>
   );
 
-  const healthScore = server.latestMetric
-    ? Math.max(0, Math.min(100, Math.round(100 - Math.max(
-        server.latestMetric.cpuPercent,
-        server.latestMetric.ramPercent,
-        server.latestMetric.diskPercent
-      ) * 0.45)))
-    : 75;
+  // Use backend-computed health score (based on real heartbeat + metrics)
+  const healthScore = (server as any).healthScore ?? 0;
 
   return (
     <AuthGuard>
       <DashboardLayout>
         <Toaster theme="dark" position="bottom-right" />
 
-        <main className="mx-auto max-w-[1440px] px-6 py-6 space-y-6">
-
-          {/* ── Header ──────────────────────────────────────────────────── */}
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-                <Link to="/infrastructure" className="hover:text-foreground transition">Infrastructure</Link>
-                <span>/</span>
-                <Link to="/servers" className="hover:text-foreground transition">Servers</Link>
-                <span>/</span>
-                <span className="text-foreground">{server.name}</span>
-              </div>
+        {/* Server Header */}
+        <div className="bg-white border-b border-[#E2E8F0]">
+          <div className="max-w-[1440px] mx-auto px-6 py-4">
+            <div className="flex items-center gap-1.5 text-xs text-[#64748B] mb-2">
+              <Link to="/servers" className="hover:text-[#0F172A] transition">Servers</Link>
+              <span>/</span>
+              <span className="text-[#0F172A]">{server.name}</span>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{server.name}</h1>
-                <span className={`text-[11px] px-2.5 py-0.5 rounded-full border font-medium ${STATUS_BADGE[server.status] ?? STATUS_BADGE.unknown}`}>
-                  {server.status.charAt(0).toUpperCase() + server.status.slice(1)}
-                </span>
+                <h1 className="text-xl font-semibold text-[#0F172A]">{server.name}</h1>
+                <span className={`text-[11px] px-2 py-0.5 rounded-full border font-medium ${
+                  server.status === "online" ? "bg-green-50 text-green-700 border-green-200" :
+                  server.status === "offline" ? "bg-red-50 text-red-700 border-red-200" :
+                  "bg-gray-50 text-gray-600 border-gray-200"
+                }`}>{server.status}</span>
+                {live && <span className="text-[10px] text-green-600 flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />Live</span>}
               </div>
-              <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5 font-mono"><Globe className="h-3 w-3" />IP: {server.host}</span>
-                {server.provider !== "custom" && <span className="uppercase">{server.provider}</span>}
-                {server.region && <span>{server.region}</span>}
-                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Uptime: {metric?.loadAverage ? "Active" : "—"}</span>
+              <div className="flex items-center gap-2">
+                <button onClick={loadAll} className="h-8 w-8 rounded-md border border-[#E2E8F0] flex items-center justify-center hover:bg-gray-50 transition">
+                  <RefreshCw className="h-3.5 w-3.5 text-[#64748B]" />
+                </button>
+                <Link to="/server-software/$serverId" params={{ serverId }}
+                  className="h-8 px-3 rounded-md border border-[#E2E8F0] flex items-center gap-1.5 hover:bg-gray-50 transition text-xs text-[#64748B]">
+                  Software
+                </Link>
+                <Link to="/server-commands/$serverId" params={{ serverId }}
+                  className="h-8 px-3 rounded-md border border-[#E2E8F0] flex items-center gap-1.5 hover:bg-gray-50 transition text-xs text-[#64748B]">
+                  <Terminal className="h-3 w-3" /> Terminal
+                </Link>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {server.status === "online" ? (
-                <span className="flex items-center gap-1.5 text-xs text-green-400">
-                  <span className={`h-2 w-2 rounded-full bg-green-400 ${live ? "animate-pulse" : ""}`} />
-                  {live ? "Live" : "Online"}
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className="h-2 w-2 rounded-full bg-gray-400" />
-                  {server.status === "unknown" ? "Awaiting Agent" : "Offline"}
-                </span>
-              )}
-              <button onClick={loadAll} className="h-9 w-9 rounded-lg border border-border flex items-center justify-center hover:bg-secondary/40 transition">
-                <RefreshCw className="h-4 w-4 text-muted-foreground" />
-              </button>
+            <div className="flex items-center gap-4 mt-2 text-xs text-[#64748B]">
+              <span className="font-mono">{server.host}</span>
+              {server.provider !== "custom" && <span className="uppercase">{server.provider}</span>}
+              {server.region && <span>{server.region}</span>}
             </div>
           </div>
+        </div>
+
+        <main className="mx-auto max-w-[1440px] px-6 py-6 space-y-6">
 
           {/* ── Main grid: content + sidebar ────────────────────────────── */}
           <div className="grid lg:grid-cols-[1fr_320px] gap-6">
@@ -676,7 +735,7 @@ function ServerDashboard() {
 
             {/* Right sidebar */}
             <div className="space-y-4">
-              <HealthScoreRing score={healthScore} />
+              <HealthScoreRing score={healthScore} serverStatus={server.status} />
               <ActiveAlerts metric={metric} apps={apps} serverId={server.id} />
               <AIInsightCard apps={apps} metric={metric} serverId={server.id} />
               <AgentInfoPanel server={server} />

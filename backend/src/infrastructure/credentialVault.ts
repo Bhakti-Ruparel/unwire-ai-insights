@@ -13,7 +13,16 @@ const TAG_LENGTH = 16;
 const SALT = "unwire-infra-vault-v1";
 
 function getKey(): Buffer {
-  const secret = process.env.INFRA_ENCRYPTION_KEY || process.env.JWT_SECRET || "default-dev-key-change-in-production";
+  const secret =
+    process.env.INFRA_ENCRYPTION_KEY ||
+    process.env.JWT_SECRET ||
+    (process.env.NODE_ENV === "production"
+      ? (() => {
+          throw new Error(
+            "INFRA_ENCRYPTION_KEY must be set in production (used to encrypt stored server credentials)."
+          );
+        })()
+      : "unwire-dev-vault-key-do-not-use-in-production");
   return scryptSync(secret, SALT, 32);
 }
 
